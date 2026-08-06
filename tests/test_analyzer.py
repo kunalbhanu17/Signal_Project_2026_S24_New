@@ -21,3 +21,10 @@ def test_stft_shape():
     signal = waveforms.sine(440, 1.0, 8000)
     freqs, times, mag = stft.stft_spectrogram(signal, 8000, nperseg=256)
     assert mag.shape == (len(freqs), len(times))
+
+
+def test_to_db_peak_is_zero_and_floor_is_respected():
+    magnitude = np.array([0.001, 1.0, 0.5])
+    db = freq_domain.to_db(magnitude, floor_db=-40.0)
+    assert np.isclose(db[1], 0.0)
+    assert np.all(db >= -40.0)

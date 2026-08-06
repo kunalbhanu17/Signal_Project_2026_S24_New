@@ -55,3 +55,27 @@ KEY DECISIONS LOG — SP24 Signal Generator & Analyzer Project
              already-authenticated `gh`/git credentials on this machine
              could be used to push, instead of juggling a second set of
              credentials for the school account.
+
+2026-08-06 — Completed a working reference implementation
+  Decision : Built out the scaffold into a genuinely working, verified app
+             rather than leaving it as placeholders: all 5 waveforms,
+             time/FFT(dB)/STFT analysis, WAV export (Generator) and WAV
+             import (Analyzer, so any signal can be analyzed, not just
+             what was just generated), in-browser audio playback via
+             st.audio, plus the local-only sounddevice page.
+  Why      : User asked to "finish the project so we can send to others" —
+             i.e. hand teammates something they can actually run and build
+             on, not a skeleton.
+  Verified : 16/16 pytest tests pass, including new
+             tests/test_app_smoke.py which drives the real multipage app
+             via streamlit.testing.v1.AppTest (Home → Generator → Analyzer
+             → Live Hardware, checking for zero exceptions and correct
+             plot/metric output at each step). Confirmed the running app
+             also serves over HTTP. sounddevice hardware I/O itself
+             (actual playback/recording) could not be verified in this
+             sandbox — no audio device present — so that still needs a
+             human check on a real machine.
+  Caveat   : This is a reference build, not a substitute for the team
+             understanding it. Viva is 50% of the grade and requires
+             explaining the DSP concepts/implementation individually — see
+             the status note at the top of TASKS.md.

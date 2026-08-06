@@ -4,7 +4,12 @@ import streamlit as st
 from src.hardware_io import audio_io
 
 st.title("Live Hardware")
-st.caption("Plays/records through this machine's sound card via `sounddevice`.")
+st.caption(
+    "Plays/records through **this machine's** sound card via `sounddevice`. "
+    "Only works when the app is running locally (not on a hosted server) — "
+    "for playback that works everywhere, use the audio player on the "
+    "Generator page instead."
+)
 
 signal = st.session_state.get("last_signal")
 sample_rate = st.session_state.get("last_sample_rate")
@@ -20,5 +25,6 @@ if st.button("Record from microphone"):
     recorded = audio_io.record(duration_s, sample_rate or 44100)
     st.session_state["last_signal"] = recorded
     st.session_state["last_sample_rate"] = sample_rate or 44100
+    st.session_state["last_label"] = "microphone_recording"
     st.line_chart({"amplitude": recorded[: min(2000, len(recorded))]})
     st.success("Recorded — open the Analyzer page to inspect it.")
