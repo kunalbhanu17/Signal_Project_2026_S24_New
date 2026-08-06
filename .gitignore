@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.streamlit/
+*.wav
+.DS_Store
+.env
+.claude/settings.local.json

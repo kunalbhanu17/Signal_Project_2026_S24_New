@@ -1,0 +1,57 @@
+KEY DECISIONS LOG — SP24 Signal Generator & Analyzer Project
+================================================================
+(Newest entries at the bottom. Add a dated entry whenever a real decision is made.)
+
+2026-08-06 — Project topic
+  Decision : SP24 (Web/Android/iOS app for signal generator and analyzer)
+             from the pre-approved list in the course FAQ doc.
+  Scope    : (1) Audio waveform generator — square, sine, triangular, chirp,
+             sinc, configurable frequency/duty-cycle/amplitude.
+             (2) Signal analyzer — time-domain, frequency-domain (FFT), and
+             STFT plots of an input signal.
+  Source   : Course FAQ doc (docs.google.com/document/d/1Nv5Cd5...), fetched
+             2026-08-06 — timeline, evaluation weights, report format, and
+             the SP01–SP25 topic list. Original doc link provided first
+             (1zu2Ncm...) turned out to require Google auth; FAQ doc was
+             fetched instead via the /export?format=txt redirect trick.
+  Deadline : Final submission by 20 September (per course FAQ).
+
+2026-08-06 — Tech stack
+  Decision : Python throughout — numpy/scipy for the DSP math (FFT, STFT,
+             filter design), sounddevice for audio I/O, Streamlit for the UI.
+  Why      : User asked for a stack with ready-made signal-processing
+             operations, low ramp-up for teammates, and a plausible path to
+             real hardware later. numpy/scipy is the standard DSP toolkit;
+             a single language avoids a JS/Python split; sounddevice talks
+             directly to the sound card (real hardware) and the same
+             abstraction can later target other hardware I/O (serial/ADC).
+  Rejected : Pure client-side JS (Web Audio API + React) — simplest to
+             deploy free, but weaker DSP libraries and no real hardware path.
+             Python backend + separate JS frontend — more moving parts and
+             deployment complexity than needed for a 3-person course project.
+
+2026-08-06 — Repo ownership split (for 3 people working simultaneously)
+  Decision : One repo, three module-owned directories to minimize merge
+             conflicts, each mapped to a Claude Code agent working
+             independently on its own branch:
+               src/generator/   → Person A (waveform synthesis engine)
+               src/analyzer/    → Person B (time/freq/STFT analysis engine)
+               src/hardware_io/ + app/ → Person C (audio I/O, Streamlit
+                                 integration, deployment)
+             Shared code lives in src/common/. Each person works on a
+             feature/<module> branch and merges to main via PR.
+  Why      : Keeps each person's Claude agent editing a disjoint set of
+             files most of the time, so simultaneous work rarely collides
+             on the same lines. app/ (integration layer) is the one place
+             all three modules meet, owned by Person C, merged last.
+
+2026-08-06 — GitHub repo
+  Decision : Use existing repo github.com/23f3000144/Signal_Project_2026_S24
+             (private, under the school GitHub account 23f3000144), rather
+             than creating a new repo under jitheshgopal.
+  Why      : Repo was already created under the student's school-linked
+             GitHub account for this course.
+  How      : jitheshgopal added as a collaborator with Write access so the
+             already-authenticated `gh`/git credentials on this machine
+             could be used to push, instead of juggling a second set of
+             credentials for the school account.

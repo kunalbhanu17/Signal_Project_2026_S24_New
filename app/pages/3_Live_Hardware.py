@@ -1,0 +1,24 @@
+import _pathfix  # noqa: F401  (must be first — puts repo root on sys.path)
+import streamlit as st
+
+from src.hardware_io import audio_io
+
+st.title("Live Hardware")
+st.caption("Plays/records through this machine's sound card via `sounddevice`.")
+
+signal = st.session_state.get("last_signal")
+sample_rate = st.session_state.get("last_sample_rate")
+
+if st.button("Play last generated signal") and signal is not None:
+    audio_io.play(signal, sample_rate)
+    st.success("Played.")
+elif signal is None:
+    st.info("Generate a signal on the Generator page first to enable playback.")
+
+duration_s = st.slider("Record duration (s)", 0.5, 5.0, 2.0)
+if st.button("Record from microphone"):
+    recorded = audio_io.record(duration_s, sample_rate or 44100)
+    st.session_state["last_signal"] = recorded
+    st.session_state["last_sample_rate"] = sample_rate or 44100
+    st.line_chart({"amplitude": recorded[: min(2000, len(recorded))]})
+    st.success("Recorded — open the Analyzer page to inspect it.")
