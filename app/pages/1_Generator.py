@@ -34,9 +34,13 @@ default_view_ms = float(min(50.0, duration_ms))
 view_ms = st.slider("View window (ms)", 5.0, float(duration_ms), default_view_ms)
 n_view = max(2, int(sample_rate * view_ms / 1000))
 t_ms = np.arange(n_view) / sample_rate * 1000
+show_samples = st.checkbox("Show discrete samples (stem plot)")
 
 fig, ax = plt.subplots()
-ax.plot(t_ms, signal[:n_view])
+if show_samples:
+    ax.stem(t_ms, signal[:n_view], basefmt=" ")
+else:
+    ax.plot(t_ms, signal[:n_view])
 ax.set_xlabel("Time (ms)")
 ax.set_ylabel("Amplitude")
 ax.set_title(f"{waveform_type} @ {freq_hz} Hz")
