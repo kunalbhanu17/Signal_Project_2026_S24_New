@@ -3,7 +3,7 @@
 A DSP course project (BS-ES Signal Processing, 2026): a Streamlit web app
 with (1) an audio waveform generator — square, sine, triangular, chirp,
 sinc, with configurable frequency/duty-cycle/amplitude — and (2) a signal
-analyzer that plots time-domain, frequency-domain (FFT), and STFT views of
+analyzer that plots time-domain, frequency-domain (FFT), and STFT (Short-Time Fourier Transform) views of
 a signal.
 
 **Features:**
