@@ -37,7 +37,8 @@ def test_generator_to_analyzer_pipeline_renders_all_plots():
     at.switch_page("pages/2_Analyzer.py")
     at.run(timeout=30)
     assert not at.exception
-    assert len(at.get("image")) == 3  # time domain, FFT, STFT
+    assert len(at.get("image")) == 2  # FFT, STFT (time domain is an interactive plotly chart)
+    assert len(at.get("plotly_chart")) == 1  # time domain
 
 
 def test_analyzer_prompts_when_no_signal_yet():

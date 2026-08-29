@@ -3,4 +3,5 @@ scipy
 streamlit
 sounddevice
 matplotlib
+plotly
 pytest

@@ -1,6 +1,6 @@
 import _pathfix  # noqa: F401  (must be first — puts repo root on sys.path)
-import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
 
 from src.common.wav_io import to_wav_bytes
@@ -13,7 +13,13 @@ waveform_type = st.selectbox(
 )
 freq_hz = st.slider("Frequency (Hz)", 20, 2000, 440)
 duration_s = st.slider("Duration (s)", 0.1, 5.0, 1.0)
-sample_rate = st.selectbox("Sample rate (Hz)", [8000, 16000, 44100], index=2)
+sample_rate_choice = st.selectbox("Sample rate (Hz)", ["8000", "16000", "44100", "Custom"], index=2)
+if sample_rate_choice == "Custom":
+    sample_rate = st.number_input(
+        "Custom sample rate (Hz)", min_value=100, max_value=384000, value=44100, step=100
+    )
+else:
+    sample_rate = int(sample_rate_choice)
 amplitude = st.slider("Amplitude", 0.0, 1.0, 0.8)
 
 if waveform_type == "square":
@@ -34,19 +40,25 @@ default_view_ms = float(min(50.0, duration_ms))
 view_ms = st.slider("View window (ms)", 5.0, float(duration_ms), default_view_ms)
 n_view = max(2, int(sample_rate * view_ms / 1000))
 t_ms = np.arange(n_view) / sample_rate * 1000
+sig_view = signal[:n_view]
 show_samples = st.checkbox("Show discrete samples (stem plot)")
 
-fig, ax = plt.subplots()
+fig = go.Figure()
 if show_samples:
-    ax.stem(t_ms, signal[:n_view], basefmt=" ")
+    stem_x, stem_y = [], []
+    for xi, yi in zip(t_ms, sig_view):
+        stem_x += [xi, xi, None]
+        stem_y += [0, yi, None]
+    fig.add_trace(go.Scatter(x=stem_x, y=stem_y, mode="lines", line=dict(color="steelblue"), showlegend=False))
+    fig.add_trace(go.Scatter(x=t_ms, y=sig_view, mode="markers", marker=dict(color="steelblue", size=6), showlegend=False))
 else:
-    ax.plot(t_ms, signal[:n_view])
-ax.set_xlabel("Time (ms)")
-ax.set_ylabel("Amplitude")
-ax.set_title(f"{waveform_type} @ {freq_hz} Hz")
-ax.grid(True, alpha=0.3)
-st.pyplot(fig)
-plt.close(fig)
+    fig.add_trace(go.Scatter(x=t_ms, y=sig_view, mode="lines", line=dict(color="steelblue"), showlegend=False))
+fig.update_layout(
+    title=f"{waveform_type} @ {freq_hz} Hz",
+    xaxis_title="Time (ms)",
+    yaxis_title="Amplitude",
+)
+st.plotly_chart(fig, use_container_width=True)
 
 wav_bytes = to_wav_bytes(signal, sample_rate)
 st.audio(wav_bytes, format="audio/wav")

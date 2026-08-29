@@ -1,6 +1,7 @@
 import _pathfix  # noqa: F401  (must be first — puts repo root on sys.path)
 import matplotlib.pyplot as plt
 import numpy as np
+import plotly.graph_objects as go
 import streamlit as st
 
 from src.analyzer import freq_domain, stft, time_domain
@@ -37,18 +38,21 @@ default_view_ms = float(min(50.0, duration_ms))
 view_ms = st.slider("View window (ms)", 5.0, float(duration_ms), default_view_ms)
 n_view = max(2, int(sample_rate * view_ms / 1000))
 t_ms = np.arange(n_view) / sample_rate * 1000
+sig_view = signal[:n_view]
 show_samples = st.checkbox("Show discrete samples (stem plot)")
 
-fig1, ax1 = plt.subplots()
+fig1 = go.Figure()
 if show_samples:
-    ax1.stem(t_ms, signal[:n_view], basefmt=" ")
+    stem_x, stem_y = [], []
+    for xi, yi in zip(t_ms, sig_view):
+        stem_x += [xi, xi, None]
+        stem_y += [0, yi, None]
+    fig1.add_trace(go.Scatter(x=stem_x, y=stem_y, mode="lines", line=dict(color="steelblue"), showlegend=False))
+    fig1.add_trace(go.Scatter(x=t_ms, y=sig_view, mode="markers", marker=dict(color="steelblue", size=6), showlegend=False))
 else:
-    ax1.plot(t_ms, signal[:n_view])
-ax1.set_xlabel("Time (ms)")
-ax1.set_ylabel("Amplitude")
-ax1.grid(True, alpha=0.3)
-st.pyplot(fig1)
-plt.close(fig1)
+    fig1.add_trace(go.Scatter(x=t_ms, y=sig_view, mode="lines", line=dict(color="steelblue"), showlegend=False))
+fig1.update_layout(xaxis_title="Time (ms)", yaxis_title="Amplitude")
+st.plotly_chart(fig1, use_container_width=True)
 
 st.subheader("Frequency domain (FFT)")
 freqs, magnitude = freq_domain.fft_spectrum(signal, sample_rate)
