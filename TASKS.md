@@ -54,9 +54,9 @@ Legend: `[A]` Person A (generator), `[B]` Person B (analyzer),
 ### `[B]` Analyzer (`src/analyzer/`)
 - [x] FFT (`freq_domain.py`) and STFT (`stft.py`) implemented; FFT peak
       frequency detection is unit-tested.
-- [ ] Add windowing options (Hann/Hamming/rectangular) for FFT and compare
-      spectral leakage — useful evidence for the report (currently
-      rectangular/no window on the FFT view; STFT uses scipy's default
+- [x] Add windowing options (Hann/Hamming/rectangular) for FFT and compare
+      spectral leakage — useful evidence for the report (selectable on the
+      Analyzer page; STFT still uses scipy's default
       Hann window).
 - [x] `tests/test_analyzer.py` covers FFT peak detection, RMS, STFT shape,
       and dB conversion.

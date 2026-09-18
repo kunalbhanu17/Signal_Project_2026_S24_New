@@ -1,13 +1,23 @@
 """Frequency-domain analysis (FFT) helpers."""
 import numpy as np
+from scipy.signal import get_window
+
+WINDOWS = {"rectangular": "boxcar", "hann": "hann", "hamming": "hamming"}
 
 
-def fft_spectrum(signal: np.ndarray, sample_rate: int) -> tuple[np.ndarray, np.ndarray]:
-    """Returns (freqs_hz, magnitude) for the positive-frequency half of the FFT."""
+def fft_spectrum(signal: np.ndarray, sample_rate: int, window: str = "rectangular"
+                  ) -> tuple[np.ndarray, np.ndarray]:
+    """Returns (freqs_hz, magnitude) for the positive-frequency half of the FFT.
+
+    `window` is one of WINDOWS' keys. Magnitude is normalized by the window's
+    coherent gain (sum of its samples), so "rectangular" matches the
+    unwindowed result exactly.
+    """
     n = len(signal)
-    spectrum = np.fft.rfft(signal)
+    win = get_window(WINDOWS[window], n)
+    spectrum = np.fft.rfft(signal * win)
     freqs = np.fft.rfftfreq(n, d=1.0 / sample_rate)
-    magnitude = np.abs(spectrum) / n
+    magnitude = np.abs(spectrum) / np.sum(win)
     return freqs, magnitude
 
 
