@@ -1,0 +1,724 @@
+VIVA PREPARATION — QUESTIONS + MODEL ANSWERS
+Signal Generator & Analyzer (SP24)
+=================================================
+(Viva is 50% of the grade — see course_faq_reference.md. Answers below
+are tied directly to this codebase; cite file names/line-level details
+like this in the actual viva to show you understand the implementation,
+not just the theory. See architecture_document.txt and
+key_decisions.txt for more background.)
+
+SECTION 1 — DSP FUNDAMENTALS
+-----------------------------
+1.1 What is a signal? Difference between analog and digital?
+    A signal is a function that conveys information by varying some
+    quantity over time (e.g., voltage, sound pressure). An analog
+    signal is continuous in both time and amplitude. A digital signal
+    is discrete in both: sampled at fixed time intervals and each
+    sample is quantized to a finite set of amplitude levels. In this
+    app every waveform is generated directly as a digital signal — a
+    numpy array of floats — there is never a continuous-time
+    representation.
+
+1.2 Nyquist–Shannon sampling theorem?
+    A continuous signal band-limited to frequency f_max can be
+    perfectly reconstructed from its samples if the sampling rate
+    fs > 2 * f_max. That minimum rate, 2*f_max, is the Nyquist rate.
+
+1.3 Nyquist frequency?
+    For a given sample rate fs, the Nyquist frequency is fs/2 — the
+    highest frequency that can be represented without aliasing. In
+    this app, `fft_spectrum()` only computes up to fs/2 because it uses
+    `np.fft.rfft`/`rfftfreq`, which inherently returns only the
+    non-negative-frequency half.
+
+1.4 Aliasing — how to demonstrate it in this app?
+    Aliasing happens when a signal contains (or is sampled at a rate
+    that makes it appear to contain) frequency content above the
+    Nyquist frequency; it gets "folded back" and misrepresented as a
+    lower frequency. To demonstrate: generate a sine wave with
+    `freq_hz` close to or above `sample_rate / 2` on the Generator
+    page, then view its FFT on the Analyzer page — the peak will not
+    appear at the true frequency, or will alias to a mirrored lower
+    frequency, because the code performs no anti-aliasing or input
+    validation preventing freq_hz > fs/2.
+
+1.5 Why do the plots "look" continuous when the signal is discrete?
+    Per architecture_document.txt section 5: (a) matplotlib/Plotly's
+    default line mode draws straight segments connecting consecutive
+    samples ("connect the dots"), and (b) typical sample rates
+    (8000–44100 Hz) are high relative to the audio frequencies plotted,
+    so consecutive samples are close together and the interpolated
+    line looks smooth. The app also has a "Show discrete samples (stem
+    plot)" checkbox that draws each sample as an individual marker,
+    plus Plotly zoom/scroll, to let a user see the actual discrete
+    samples over a few cycles.
+
+1.6 Amplitude, frequency, phase, period?
+    Amplitude = peak magnitude of the oscillation (A in `amplitude *
+    sin(...)`). Frequency = oscillations per second (Hz), `freq_hz` in
+    the code. Phase = the argument inside the sinusoid at t=0,
+    determining horizontal shift (this app always starts phase at 0).
+    Period = 1/frequency, the time for one full cycle.
+
+1.7 Duty cycle — which waveform uses it?
+    Duty cycle is the fraction of one period during which a square
+    wave is "high" (+amplitude) rather than "low" (-amplitude). Only
+    `square()` in waveforms.py takes a `duty_cycle` parameter
+    (default 0.5, i.e., symmetric square wave).
+
+1.8 Chirp signal — practical uses?
+    A chirp is a signal whose frequency changes (sweeps) over time —
+    here linearly from f0_hz to f1_hz (`chirp()` in waveforms.py).
+    Real-world uses: radar/sonar (pulse compression), audio testing
+    (frequency response sweeps), and spread-spectrum communications.
+
+1.9 Why is sinc important (relation to ideal low-pass filter)?
+    sinc(x) = sin(pi*x)/(pi*x) is the impulse response of an ideal
+    (brick-wall) low-pass filter — its Fourier Transform is a perfect
+    rectangular passband. It's also the interpolation kernel implied
+    by the sampling theorem (reconstructing a continuous signal from
+    samples). `sinc_pulse()` in this app generates a time-domain sinc
+    pulse via `np.sinc(2 * freq_hz * t)`.
+
+1.10 What happens to a sinc pulse as freq_hz increases?
+    Increasing freq_hz compresses the sinc pulse in time (narrower
+    main lobe, faster-oscillating side lobes) — by the
+    time-frequency duality, a narrower time-domain pulse corresponds
+    to a wider frequency-domain rectangle (and vice versa), matching
+    the sinc-rect Fourier pair.
+
+1.11 RMS — physical meaning?
+    RMS = sqrt(mean(signal^2)) (`rms()` in time_domain.py). Physically
+    it represents the equivalent DC value that would dissipate the same
+    average power in a resistive load — it's the standard measure of a
+    signal's "effective" magnitude.
+
+1.12 Peak-to-peak vs RMS?
+    Peak-to-peak = max(signal) - min(signal) (`peak_to_peak()` in
+    time_domain.py) — the full excursion of the waveform. RMS reflects
+    average power/energy content, not just the extremes; for a sine
+    wave they are related by a fixed ratio (see 5.3/5.4) but for other
+    waveforms (e.g., with noise or spikes) they diverge.
+
+1.13 Quantization — where does it occur here?
+    Quantization is the mapping of a continuous (or high-precision)
+    amplitude value to one of a finite set of discrete levels. It
+    happens in `wav_io.to_wav_bytes()`, which converts the float64
+    signal in [-1, 1] to 16-bit integer PCM (65536 discrete levels) —
+    this is a lossy step (quantization error/noise is introduced).
+
+SECTION 2 — WAVEFORM GENERATION (src/generator/waveforms.py)
+--------------------------------------------------------------
+2.1 How does `_time_vector()` work?
+    `n_samples = int(duration_s * sample_rate)`, then
+    `t = np.arange(n_samples) / sample_rate`, i.e., t = n / fs for n =
+    0, 1, ..., n_samples-1. Dividing by sample_rate (rather than
+    multiplying) converts a sample *index* (an integer count) into a
+    *time in seconds* — index n occurs at time n/fs because samples are
+    taken fs times per second.
+
+2.2 Sine wave formula?
+    x[n] = A * sin(2*pi*f*t[n]), implemented as `amplitude * np.sin(2
+    * np.pi * freq_hz * t)`. 2*pi*f converts frequency in Hz to
+    angular frequency in rad/s, matching numpy's radian-based sin().
+
+2.3 Square wave without sign(sin())?
+    The code computes `phase = (freq_hz * t) % 1.0` — this is the
+    fractional position within the current cycle, ranging over [0,1)
+    and resetting every period. Then
+    `np.where(phase < duty_cycle, 1.0, -1.0)` sets the signal high
+    while phase is in the first `duty_cycle` fraction of the period and
+    low otherwise. This avoids relying on the sign of a sinusoid (which
+    would only give a fixed 50% duty cycle) and lets duty_cycle be
+    tuned directly.
+
+2.4 Effect of duty_cycle?
+    duty_cycle controls what fraction of each period is spent at
+    +amplitude vs -amplitude. duty_cycle=0.5 gives a symmetric wave
+    (equal high/low time); smaller values (e.g., 0.1) give short high
+    pulses and long low intervals; larger values (e.g., 0.9) give the
+    opposite.
+
+2.5 Triangular wave derivation?
+    `phase = (freq_hz * t) % 1.0` as before, then
+    `amplitude * (2*abs(2*(phase - floor(phase+0.5))) - 1)`. The term
+    `phase - floor(phase + 0.5)` folds phase into the range [-0.5, 0.5)
+    (centering it around zero each period). Taking `abs()` of `2 *`
+    that produces a value that rises from 0 to 1 and falls back to 0
+    linearly (a triangular ramp in [0,1]); the outer `2*(...) - 1`
+    rescales that to [-1, 1], giving the classic triangle shape.
+
+2.6 Chirp — instantaneous phase formula, why quadratic in time?
+    `k = (f1_hz - f0_hz) / duration_s` (the linear rate of frequency
+    change, Hz/s). `phase = 2*pi*(f0_hz*t + 0.5*k*t^2)`. The
+    instantaneous frequency must increase linearly with time:
+    f(t) = f0 + k*t. Phase is the time-integral of angular frequency,
+    phi(t) = 2*pi * integral(f(t) dt) = 2*pi*(f0*t + 0.5*k*t^2) — the
+    quadratic term arises because integrating a linear function of t
+    yields a quadratic.
+
+2.7 Chirp rate k — units?
+    k = (f1_hz - f0_hz) / duration_s, in Hz/s (or Hz per second) — the
+    rate at which instantaneous frequency changes over the sweep.
+
+2.8 Why subtract duration_s/2 for the sinc pulse?
+    `t = _time_vector(...) - duration_s/2` shifts the time origin so
+    that t=0 (the peak of the sinc function, since sinc(0)=1) falls at
+    the midpoint of the generated duration, rather than at the very
+    start. This centers the pulse in the plotted/exported window
+    instead of showing only its trailing (decaying) half.
+
+2.9 Why pure functions, and testing benefit?
+    All five generators take plain numeric parameters and return a
+    numpy array — no Streamlit calls, no file I/O, no hardware access.
+    This makes them trivially unit-testable (call the function, assert
+    properties of the returned array) without needing a running app,
+    a browser, or an audio device, and it decouples the DSP math from
+    the UI so either can change independently (see 8.3, tests/
+    test_generator.py).
+
+2.10 What if frequency_hz exceeds fs/2?
+    None of the generator functions validate frequency against the
+    Nyquist limit — they will happily compute samples for any
+    frequency. The resulting digital signal will be aliased: when
+    later analyzed via FFT, energy above fs/2 folds back and appears
+    as a lower, incorrect frequency (see 1.4, 12.3).
+
+2.11 Instantaneous frequency of a chirp, via dphi/dt?
+    phi(t) = 2*pi*(f0*t + 0.5*k*t^2). d(phi)/dt = 2*pi*(f0 + k*t).
+    Instantaneous frequency f_inst(t) = (1/2pi) * dphi/dt = f0 + k*t —
+    confirming the frequency sweeps linearly from f0 at t=0 to f0 +
+    k*duration_s = f1 at t=duration_s, as intended.
+
+SECTION 3 — FREQUENCY-DOMAIN ANALYSIS (src/analyzer/freq_domain.py)
+-----------------------------------------------------------------------
+3.1 Why use Fourier Transform on a time-domain signal?
+    The Fourier Transform decomposes a time-domain signal into the
+    sinusoidal frequency components that compose it, revealing what
+    frequencies are present and their relative strength — information
+    that is not directly visible in the time-domain waveform (e.g.,
+    confirming a generated "440 Hz sine" really peaks at 440 Hz, or
+    seeing the harmonic content of a square wave).
+
+3.2 FFT vs DFT?
+    The DFT (Discrete Fourier Transform) is the mathematical
+    transform; computing it directly is O(N^2). The FFT (Fast Fourier
+    Transform) is an algorithm (e.g., Cooley–Tukey) that computes
+    exactly the same DFT result in O(N log N) by recursively
+    exploiting symmetries, making it practical for real-time/large-N
+    use. `np.fft.rfft` is numpy's FFT implementation specialized for
+    real-valued input.
+
+3.3 Why `np.fft.rfft` instead of `np.fft.fft`?
+    The generated/analyzed signals are always real-valued (real audio
+    samples), whose full FFT is Hermitian-symmetric (the negative-
+    frequency half is just the complex conjugate mirror of the
+    positive half — no new information). `rfft` computes only the
+    non-negative-frequency half, saving roughly half the computation
+    and memory, and `rfftfreq` returns the matching frequency bins.
+
+3.4 What is a single-sided spectrum, and why discard the negative half?
+    A single-sided (or "one-sided") spectrum shows only frequencies
+    from 0 to fs/2. For a real signal, the negative-frequency
+    components are redundant (complex conjugates of the positive
+    ones) and carry no extra information about a real physical signal,
+    so discarding them (which `rfft` does automatically) loses nothing
+    and simplifies interpretation — real signals are naturally
+    described by "how much of frequency f is present," not by
+    separate positive/negative frequency components.
+
+3.5 How are frequency bins computed, and what sets resolution?
+    `np.fft.rfftfreq(n, d=1/sample_rate)` returns bin centers
+    0, fs/n, 2*fs/n, ..., up to ~fs/2. Frequency resolution (bin
+    spacing) = fs/n = 1/duration_s — i.e., resolution improves (finer
+    bins) with longer signal duration (more samples), independent of
+    sample rate directly (sample rate sets the *range*, up to fs/2;
+    duration sets the *resolution* within that range).
+
+3.6 Why normalize FFT magnitude by n?
+    `magnitude = np.abs(spectrum) / n`. The raw DFT/FFT sum scales
+    with the number of samples summed (N), so magnitude grows with N
+    even for the same physical amplitude. Dividing by n (the signal
+    length) normalizes the magnitude so it reflects the actual
+    amplitude of each frequency component, independent of how many
+    samples were taken.
+
+3.7 Explain `to_db()`?
+    `to_db(magnitude, floor_db=-100.0)`: finds `peak = max(magnitude)`
+    (falling back to 1.0 if peak is 0, to avoid divide-by-zero);
+    computes `20*log10(max(magnitude, 1e-12) / peak)` — the standard
+    amplitude-to-dB formula (20, not 10, because magnitude is an
+    amplitude-like quantity, and dB for power would use 10; power is
+    proportional to amplitude^2, so 10*log10(amp^2) = 20*log10(amp)).
+    Normalizing to the *signal's own peak* means the plot always shows
+    0 dB at the strongest frequency component, making different
+    signals visually comparable regardless of absolute amplitude. The
+    `1e-12` inside the log avoids log(0) = -infinity, and the final
+    `np.maximum(db, floor_db)` clips any very quiet bin to -100 dB so
+    the plot's y-axis stays bounded and readable.
+
+3.8 Sine vs square wave FFT — why does square have odd harmonics?
+    A pure sine wave's FFT is (ideally) a single sharp peak at its
+    fundamental frequency (plus DC=0 elsewhere). A square wave's
+    Fourier series contains only odd harmonics (f, 3f, 5f, 7f, ...)
+    with amplitudes decaying as 1/n — a mathematical consequence of the
+    square wave's half-wave symmetry (x(t) = -x(t + T/2)), which forces
+    all even-harmonic Fourier coefficients to be zero.
+
+3.9 Spectral leakage — could it occur here?
+    Spectral leakage happens when a signal's frequency doesn't align
+    exactly with an FFT bin center, or the observed segment isn't an
+    exact integer number of periods — the FFT then "leaks" energy into
+    neighboring bins instead of a single sharp line, because the
+    analysis implicitly assumes the observed segment repeats
+    periodically. Since `fft_spectrum()` applies no window function
+    (e.g., no Hann/Hamming) before the rfft, leakage is fully possible
+    and commonly visible here whenever the chosen frequency/duration
+    combination isn't an exact integer number of cycles within the
+    sampled duration.
+
+3.10 Effect of doubling duration on FFT frequency resolution?
+    Doubling duration at a fixed sample rate doubles the number of
+    samples n, which halves the frequency resolution value (finer
+    resolution): bin spacing = fs/n, so resolution improves (smaller
+    Hz-per-bin) — you get more, narrower frequency bins covering the
+    same 0-to-fs/2 range.
+
+SECTION 4 — SHORT-TIME FOURIER TRANSFORM / SPECTROGRAM (src/analyzer/stft.py)
+---------------------------------------------------------------------------------
+4.1 Why is a single FFT insufficient for a chirp?
+    A single FFT over the whole signal gives one static frequency-vs-
+    magnitude view, averaged/aggregated over the entire duration — it
+    tells you *which* frequencies are present overall but not *when*.
+    For a chirp, whose frequency content changes continuously with
+    time, a single FFT would just show broad energy spread across the
+    swept range, hiding the fact that the frequency is changing
+    sequentially.
+
+4.2 What is the STFT?
+    The Short-Time Fourier Transform splits the signal into short,
+    (optionally overlapping) time segments, applies a window function
+    and an FFT to each segment independently, and assembles the
+    results into a 2D time-frequency representation — trading global
+    frequency resolution for the ability to see how frequency content
+    evolves over time.
+
+4.3 What is `nperseg`, and its trade-off?
+    `nperseg` (default 256 in `stft_spectrogram()`) is the number of
+    samples per STFT segment/window. A larger `nperseg` (e.g., 1024)
+    gives finer frequency resolution per segment (more FFT bins) but
+    coarser time resolution (each segment spans more time, so you
+    can't localize fast changes as precisely). A smaller `nperseg`
+    gives finer time localization but coarser frequency resolution.
+    This is exactly the classic STFT time-frequency resolution
+    trade-off.
+
+4.4 Time-frequency uncertainty principle in STFT?
+    You cannot simultaneously achieve arbitrarily fine time resolution
+    AND arbitrarily fine frequency resolution — analogous to the
+    Heisenberg uncertainty principle. A short window localizes *when*
+    something happens well but blurs *what* frequency it is (few FFT
+    bins); a long window resolves frequency finely but blurs *when* it
+    happened (few time steps).
+
+4.5 What do a spectrogram's axes/color represent?
+    `stft_spectrogram()` returns `(freqs, times, magnitude)`. The
+    Analyzer page renders this as a 2D plot: x-axis = time (s), y-axis
+    = frequency (Hz), and color/intensity (via matplotlib's
+    `pcolormesh` + colorbar) = magnitude of that frequency component at
+    that time.
+
+4.6 What would a chirp's spectrogram look like?
+    A diagonal line (or band) rising or falling with time, tracing the
+    instantaneous frequency f0 -> f1 linearly across the plot — visibly
+    showing the frequency sweep, which a plain FFT could not show.
+
+4.7 Default window function in scipy's STFT, and why windowing matters?
+    `scipy.signal.stft`'s default window is a Hann window. Windowing
+    tapers each segment's edges toward zero before the FFT, reducing
+    the discontinuity introduced by chopping the signal into finite
+    segments (which would otherwise cause severe spectral leakage —
+    see 3.9) — it smooths the implicit periodic-repetition assumption
+    of the FFT.
+
+4.8 Overlap between segments — scipy default, and why used?
+    `scipy.signal.stft`'s default overlap (`noverlap`) is `nperseg //
+    2` (50% overlap) when not explicitly specified. Overlap is used so
+    that windowing (which tapers/suppresses energy near segment edges)
+    doesn't cause information near those edges to be lost or
+    under-represented — overlapping segments ensure every part of the
+    signal is fully "seen" by at least one window's high-weight
+    center region.
+
+SECTION 5 — TIME-DOMAIN ANALYSIS (src/analyzer/time_domain.py)
+------------------------------------------------------------------
+5.1 How is the time vector reconstructed with no stored timestamps?
+    `time_vector(signal, sample_rate)` computes
+    `np.arange(len(signal)) / sample_rate` — because samples are known
+    to be taken at a fixed rate, sample index n always corresponds to
+    time n/fs; no separate timestamp storage is needed, matching how
+    `_time_vector()` builds time during generation (2.1).
+
+5.2 RMS implementation vs mathematical definition?
+    `rms(signal) = sqrt(mean(signal^2))`, i.e.,
+    `np.sqrt(np.mean(np.square(signal)))` — this is exactly the
+    textbook RMS definition: square each sample, average the squares,
+    take the square root.
+
+5.3 Theoretical RMS of a sine wave of amplitude A?
+    RMS = A / sqrt(2) ≈ 0.707*A. For a generated `sine(freq_hz,
+    duration_s, sample_rate, amplitude=A)` with enough samples per
+    cycle, `rms()` should return a value very close to A/sqrt(2)
+    (small deviation only from a non-integer number of cycles in the
+    sampled duration).
+
+5.4 Theoretical peak-to-peak of a sine wave of amplitude A?
+    Peak-to-peak = 2*A (from +A to -A). `peak_to_peak()` computes
+    `max(signal) - min(signal)`, which for a sine sampled over at least
+    one quarter-cycle at the peak/trough should closely match 2*A.
+
+SECTION 6 — WAV / AUDIO ENCODING (src/common/wav_io.py)
+------------------------------------------------------------
+6.1 What is PCM?
+    Pulse Code Modulation: a method of digitally representing a
+    sampled analog signal by encoding each sample's amplitude as a
+    number at fixed, regular intervals — the standard uncompressed
+    format WAV files use.
+
+6.2 Why clip to [-1,1] and multiply by 32767 (not 32768)?
+    `np.clip(signal, -1.0, 1.0)` guards against out-of-range values
+    (e.g., amplitude > 1, or floating point overshoot) that would
+    otherwise overflow/wrap when cast to int16. Multiplying by 32767
+    (not 32768) is because signed 16-bit integers range from -32768 to
+    +32767 — an asymmetric range. Using 32767 as the scale factor
+    guarantees the result never exceeds the representable maximum
+    (avoiding overflow at +1.0), at the small cost of not quite
+    reaching -32768 at -1.0.
+
+6.3 What is 16-bit PCM's dynamic range/resolution?
+    16 bits gives 2^16 = 65536 discrete amplitude levels, corresponding
+    to a theoretical dynamic range of about 96 dB (roughly 6 dB per
+    bit) — the standard resolution for CD-quality audio.
+
+6.4 How does decoding handle stereo, and why average channels?
+    `from_wav_bytes()` checks `samples.ndim > 1` (multiple channels)
+    and does `samples.mean(axis=1)` to downmix to mono by averaging
+    all channels sample-by-sample. Averaging (rather than picking one
+    channel) preserves information/energy from both channels
+    approximately, giving a representative mono signal rather than
+    silently discarding one channel's content (relevant if the two
+    channels differ).
+
+6.5 Why divide by `np.iinfo(dtype).max` when decoding?
+    WAV integer PCM samples are stored as raw integers (e.g., int16
+    ranging up to 32767). Dividing by the dtype's max value
+    (`np.iinfo(samples.dtype).max`) rescales those integers back into
+    the app's internal convention of float samples in [-1, 1], the
+    inverse of the `* 32767` encoding step in `to_wav_bytes()`, so
+    analysis code can treat any imported signal uniformly regardless
+    of its original bit depth.
+
+6.6 WAV header contents, and why return sample_rate separately?
+    A WAV file's header (RIFF/fmt chunk) stores metadata including the
+    sample rate, number of channels, bits per sample, and byte rate,
+    followed by the raw PCM data chunk. `wavfile.read()` parses this
+    header and returns the sample rate alongside the sample array,
+    which `from_wav_bytes()` passes back as a tuple `(samples,
+    sample_rate)` because downstream analysis (FFT bin frequencies,
+    time vector) needs the *actual* sample rate of the uploaded file,
+    which may differ from whatever the app most recently used to
+    generate a signal.
+
+SECTION 7 — HARDWARE I/O (src/hardware_io/audio_io.py)
+------------------------------------------------------------
+7.1 Why isolate `sounddevice` into its own module?
+    Keeping all `sounddevice`/PortAudio calls inside
+    `hardware_io/audio_io.py` means `generator` and `analyzer` never
+    import or depend on hardware libraries — they stay pure numpy code
+    that can run (and be unit tested) on any machine, including CI or
+    a cloud container with no sound card, with no risk of an import or
+    runtime error from a missing audio device (see 9.2).
+
+7.2 Blocking `sd.play()`+`sd.wait()` vs non-blocking?
+    `play()` calls `sd.play(signal, samplerate=sample_rate)` which
+    starts playback asynchronously, then (if `blocking=True`, the
+    default) calls `sd.wait()`, which blocks the calling code until
+    playback finishes. A non-blocking call would return immediately
+    while audio plays in the background, letting the caller continue
+    other work concurrently — useful for responsiveness but requiring
+    explicit synchronization if you need to know when playback ends.
+
+7.3 Why does Live Hardware only work locally?
+    `sounddevice`/PortAudio talks to whatever physical sound device
+    the *Python process* itself is running on. On Streamlit Community
+    Cloud, that process runs inside a Linux container with no attached
+    speaker or microphone — so there is no real hardware for
+    `sd.play()`/`sd.rec()` to reach, regardless of the visiting user's
+    own device.
+
+7.4 Why does `st.audio()` work everywhere but sounddevice doesn't?
+    `st.audio()` on the Generator page streams WAV bytes to the user's
+    *browser*, which plays them via its own HTML5 `<audio>` element —
+    genuine client-side playback using the visitor's own speakers, with
+    no server-side hardware involved at all. `sounddevice` playback, by
+    contrast, is server-side and hardware-bound to the process running
+    the app, which is why it fails on a cloud server with no audio
+    hardware.
+
+7.5 What does PortAudio abstract over?
+    PortAudio is a cross-platform, open-source audio I/O library that
+    provides one common API over the different native audio backends
+    of each OS (e.g., WASAPI/DirectSound on Windows, CoreAudio on
+    macOS, ALSA on Linux) — `sounddevice` is a Python binding on top of
+    it, letting the same Python code play/record audio across
+    platforms.
+
+SECTION 8 — SOFTWARE ARCHITECTURE & DESIGN DECISIONS
+---------------------------------------------------------
+8.1 Overall architecture / data flow?
+    A single Python codebase, Streamlit multipage UI, no separate
+    frontend/backend, no database. `app/` pages call into
+    `src/generator`, `src/analyzer`, `src/hardware_io`, and
+    `src/common/wav_io`. Typical flow: user sets parameters on the
+    Generator page -> `waveforms.<type>()` returns a numpy array ->
+    stored in `st.session_state` -> encoded via `wav_io.to_wav_bytes()`
+    for playback/download -> user switches to Analyzer (or uploads a
+    WAV) -> `wav_io.from_wav_bytes()` decodes if needed ->
+    `time_domain`/`freq_domain`/`stft` functions produce the three
+    analysis views. See architecture_document.txt section 1/3 for the
+    full diagram.
+
+8.2 Why the generator/analyzer/hardware_io/common/app split?
+    It mirrors the three-person team: `src/generator/` -> Person A,
+    `src/analyzer/` -> Person B, `src/hardware_io/` + `app/` -> Person
+    C, with `src/common/` shared by all. Each person mostly edits a
+    disjoint set of files, minimizing merge conflicts when working
+    simultaneously on separate feature branches; `app/` (the one place
+    all three modules meet) is owned by Person C and merged last (see
+    key_decisions.txt, 2026-08-06 "Repo ownership split").
+
+8.3 Why keep generator/analyzer "pure", and the testing benefit?
+    They contain no Streamlit imports and no hardware calls — just
+    numpy/scipy math on plain arguments returning arrays. This lets
+    every DSP function be unit-tested directly (call function, assert
+    on the returned array) with zero dependency on a running UI or
+    physical audio device, and it lets UI/hardware code change
+    independently of the DSP core.
+
+8.4 How does "current signal" state pass between pages with no database?
+    Streamlit's `st.session_state` is an in-memory dictionary scoped to
+    the user's browser session. The Generator page writes
+    `st.session_state["last_signal"]` /
+    `["last_sample_rate"]` / `["last_label"]`; the Analyzer page reads
+    those same keys. There is no persistence beyond the session — state
+    is lost when the browser session ends (architecture_document.txt
+    section 3).
+
+8.5 Streamlit's execution model, and role of session_state?
+    Streamlit reruns the *entire* script for a page top-to-bottom on
+    every user interaction (e.g., moving a slider) — there's no
+    persistent server-side object model between reruns by default.
+    `st.session_state` is the mechanism that survives reruns (and page
+    switches within a session), letting the app remember values (like
+    the last generated signal) across those repeated top-to-bottom
+    executions.
+
+8.6 Why Python over client-side JS (Web Audio API + React)?
+    Python was chosen because numpy/scipy provide ready-made,
+    well-tested DSP primitives (FFT, STFT, filter design) that would
+    have to be reimplemented or found as weaker equivalents in JS; a
+    single language avoids splitting the team's effort across a
+    JS/Python boundary; and `sounddevice` gives a plausible path to
+    real hardware I/O (and could extend to other hardware like
+    serial/ADC later) that a pure browser-based stack cannot offer
+    (key_decisions.txt, 2026-08-06 "Tech stack").
+
+8.7 Why was Python-backend + separate JS-frontend rejected?
+    It was judged to add more moving parts and deployment complexity
+    (two codebases, an API boundary, separate deployment/build
+    pipelines) than justified for a 3-person course project on a fixed
+    deadline.
+
+8.8 Why Streamlit despite reduced UI control, and how was that addressed?
+    Streamlit was chosen for fast iteration speed and a trivial free
+    deployment path (Streamlit Community Cloud), accepting reduced
+    fine-grained UI control as the cost. Where that mattered — the
+    time-domain plots needing to be genuinely interactive (zoom into
+    individual samples) — the trade-off was worked around by rendering
+    those plots with Plotly (which supports drag-zoom/scroll) instead
+    of a static matplotlib figure, plus an explicit discrete-samples
+    stem-plot toggle.
+
+8.9 What is `_pathfix.py` for?
+    It's imported at the top of every Streamlit page to insert the
+    repository root onto `sys.path`, so that `from src... import ...`
+    statements resolve correctly no matter what working directory
+    Streamlit happens to launch the page from.
+
+SECTION 9 — TESTING
+-------------------------
+9.1 Test strategy, and how tests/ mirrors src/?
+    `tests/` mirrors `src/`'s layout 1:1: `test_generator.py`,
+    `test_analyzer.py`, `test_wav_io.py`, `test_hardware_io.py`, plus
+    `test_app_smoke.py` for the integrated app. Pure DSP modules get
+    direct unit tests; the smoke test exercises the real UI end to end.
+
+9.2 Why is the DSP core fully unit-testable but hardware_io isn't?
+    generator/analyzer/common are pure functions with no side effects
+    or external dependencies — any environment running pytest can
+    exercise them fully. `hardware_io` calls into `sounddevice`/
+    PortAudio, which requires a real physical audio device to actually
+    play/record — something that cannot be verified in a sandboxed CI
+    environment with no sound card attached (key_decisions.txt notes
+    this was left as a caveat requiring a human check on a real
+    machine).
+
+9.3 What does `test_app_smoke.py` verify, and how?
+    It uses `streamlit.testing.v1.AppTest` to drive the actual
+    multipage app (Home -> Generator -> Analyzer -> Live Hardware)
+    programmatically, simulating user interaction, and asserts there
+    are zero unhandled exceptions and that the expected number of
+    plots/metrics render at each step — catching integration-level
+    breakage that isolated unit tests of individual functions would
+    miss.
+
+9.4 How would you test duty cycle correctness or a known FFT frequency?
+    For duty cycle: generate a square wave with a known duty_cycle,
+    count (or sum) the fraction of samples at +amplitude vs the total,
+    and assert it's close to the specified duty_cycle. For FFT: generate
+    a sine wave of a known frequency, run `fft_spectrum()`, and assert
+    that `freqs[np.argmax(magnitude)]` (the frequency bin with peak
+    magnitude) is close to the generated frequency, within one FFT bin
+    width (fs/n) of tolerance.
+
+SECTION 10 — DEPLOYMENT
+-----------------------------
+10.1 Where is the app hosted, and what triggers a redeploy?
+    Hosted on Streamlit Community Cloud, tracking the private GitHub
+    repo `23f3000144/Signal_Project_2026_S24` (branch `main`). Every
+    push to `main` triggers an automatic rebuild/redeploy.
+
+10.2 requirements.txt vs packages.txt, and why sounddevice needs both?
+    `requirements.txt` lists Python package dependencies (numpy,
+    scipy, streamlit, sounddevice, matplotlib, plotly, pytest) that pip
+    installs. `packages.txt` lists apt-level (OS-level) packages needed
+    on Streamlit Cloud's Linux container — `sounddevice` depends on the
+    PortAudio C library, which is a system package, not a Python
+    package, so it must be declared separately in `packages.txt` for
+    the container to install it via apt.
+
+10.3 How is app sharing controlled independently of repo visibility?
+    Via the Streamlit Cloud dashboard's Settings -> Sharing page: the
+    underlying GitHub repository can remain private (source code
+    hidden) while the *deployed app* itself is separately set to
+    public, making it viewable by anyone with the link with no login —
+    these are two independent visibility settings.
+
+10.4 Why can't Live Hardware work on the cloud deployment for anyone?
+    Because `sounddevice` talks to the sound device of the *server
+    process*, not the visitor's device. The cloud container has no
+    physical speaker/microphone attached, so it doesn't matter whether
+    the visitor is on desktop, Android, iPhone, or an installed PWA —
+    there is no server-side hardware to play through or record from
+    (architecture_document.txt section 4).
+
+SECTION 11 — PROJECT / COURSE MANAGEMENT
+----------------------------------------------
+11.1 What is SP24 and its two required components?
+    SP24 is the pre-approved course topic: "Web/Android/iOS app for
+    signal generator and analyzer" (course_faq_reference.md). Its two
+    required components: (1) an audio waveform generator (square, sine,
+    triangular, chirp, sinc; configurable frequency, duty cycle,
+    amplitude), and (2) a signal analyzer producing time-domain,
+    frequency-domain (FFT), and STFT plots of an input signal.
+
+11.2 Individual module ownership, and can you explain another's module?
+    Per key_decisions.txt: `src/generator/` (Person A), `src/analyzer/`
+    (Person B), `src/hardware_io/` + `app/` (Person C), with
+    `src/common/` shared. Since viva is graded individually (50% of
+    the grade, per-person even in a group project per
+    course_faq_reference.md), every team member should be able to
+    explain every module, not just their own — this document exists
+    precisely so each person can study all sections regardless of who
+    wrote the corresponding code.
+
+11.3 Main alternative tech stack considered, and why rejected?
+    Two alternatives were considered and rejected (key_decisions.txt):
+    pure client-side JS (Web Audio API + React) — simplest free
+    deployment, but weaker DSP libraries and no real-hardware path; and
+    a Python backend with a separate JS frontend — more moving parts
+    and deployment complexity than warranted for a 3-person course
+    project.
+
+11.4 What would you add given more time?
+    Reasonable answers: additional filter types (low/high/band-pass
+    with adjustable cutoff), real-time streaming analysis instead of
+    static generate-then-analyze, input validation/warnings for
+    frequencies above Nyquist, windowing options for the plain FFT
+    view (to address leakage, see 3.9), and native mobile
+    (Android/iOS) wrappers per the SP24 topic's "Web/Android/iOS"
+    framing (currently delivered as a responsive web app only).
+
+SECTION 12 — LIKELY FOLLOW-UP / "GOTCHA" QUESTIONS
+--------------------------------------------------------
+12.1 Effect of increasing sample rate at fixed frequency?
+    `_time_vector`'s `n_samples = int(duration_s * sample_rate)`
+    grows, so the array gets longer (more samples over the same
+    duration) — the waveform is represented more finely in time. In
+    the FFT, `rfftfreq`'s range extends to the new, higher fs/2 (wider
+    frequency axis), while frequency resolution (fs/n = 1/duration_s)
+    is unchanged since duration_s didn't change (n and fs grew
+    proportionally).
+
+12.2 1 Hz sine for 0.5 s at fs=8000 Hz — how many samples, and FFT
+     implications?
+    `n_samples = int(0.5 * 8000) = 4000` samples. FFT bin spacing = fs/n
+    = 8000/4000 = 2 Hz. Since the signal completes exactly 0.5 cycles
+    (half a period) within the window — not an integer number of
+    cycles — the true 1 Hz component doesn't land exactly on an FFT bin
+    center (bins fall at 0, 2, 4, ... Hz), causing spectral leakage:
+    energy will spread across multiple low-frequency bins rather than
+    forming one sharp 1 Hz peak.
+
+12.3 Frequency above Nyquist — what artifact in the analyzer?
+    The generated array itself is just samples of a mathematical
+    sin()/etc. at that frequency — it doesn't "know" it's invalid. But
+    because it was effectively undersampled relative to that
+    frequency, when analyzed the energy aliases: the FFT peak appears
+    at a *lower*, folded frequency (reflected around fs/2) rather than
+    at the true generated frequency, i.e., the analyzer would report
+    an incorrect (aliased) frequency for the signal.
+
+12.4 Why floor at -100 dB instead of allowing -infinity?
+    A magnitude of exactly 0 gives log10(0) = -infinity, which would
+    break plotting (undefined axis range, no valid y-value to draw) and
+    isn't practically meaningful (real systems have a noise floor
+    anyway). Flooring at -100 dB keeps the output finite and keeps the
+    dB plot's y-axis bounded and readable, at the cost of not showing
+    truly negligible components below that floor — which is fine since
+    they're inaudible/insignificant anyway.
+
+12.5 Why `phase < duty_cycle` rather than `<=`, and does it matter?
+    The strict `<` simply picks a convention for which side of the
+    exact boundary sample (phase == duty_cycle, if it ever occurs
+    exactly, which is rare with floating point) counts as high vs low.
+    In practice it makes no perceptible difference to the duty cycle
+    over many samples/cycles — at most it could flip a single sample's
+    sign in the rare case phase lands exactly on the boundary, an
+    edge case with negligible impact on the overall waveform or its
+    measured duty cycle.
+
+12.6 End-to-end trace: user uploads a WAV to the Analyzer page.
+    (1) User uploads a file via the Analyzer page's file uploader
+    widget; (2) the page passes the raw bytes to
+    `wav_io.from_wav_bytes()`, which uses `scipy.io.wavfile.read()` to
+    parse the WAV header and PCM data, downmixes to mono via
+    channel-averaging if stereo, and normalizes the integer samples to
+    a float64 array in [-1, 1] by dividing by the dtype's max value,
+    returning `(samples, sample_rate)`; (3) this bypasses
+    `st.session_state`/the Generator entirely — the uploaded
+    `sample_rate` and `samples` are used directly; (4) the Analyzer then
+    calls `time_domain.time_vector()`/`rms()`/`peak_to_peak()`,
+    `freq_domain.fft_spectrum()` + `to_db()`, and
+    `stft.stft_spectrogram()` on that array to render the three views
+    exactly as it would for a generated signal.

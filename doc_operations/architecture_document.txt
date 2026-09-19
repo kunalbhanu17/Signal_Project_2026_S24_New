@@ -1,0 +1,180 @@
+ARCHITECTURE DOCUMENT — Signal Generator & Analyzer (SP24)
+============================================================
+(Explains how the app is built and why, for viva prep and onboarding.
+See key_decisions.txt for the history of *why* choices were made;
+this document describes the *current* implementation.)
+
+1. HIGH-LEVEL OVERVIEW
+-----------------------
+A single Python codebase, all execution server-side (or on your own
+machine when run locally), presented through a Streamlit multipage web
+UI. There is no separate frontend/backend split and no database — every
+page reruns the relevant Python top-to-bottom on each interaction
+(Streamlit's execution model), holding the "current signal" in
+st.session_state so it can pass between pages.
+
+    +-------------------------------------------------------------+
+    |                     Streamlit UI (app/)                     |
+    |   Home.py  |  1_Generator.py | 2_Analyzer.py | 3_Live_Hw.py  |
+    +-------------------------------------------------------------+
+                 |                |                |
+                 v                v                v
+    +--------------------+  +---------------+  +----------------+
+    | src/generator/      |  | src/analyzer/ |  | src/hardware_io|
+    | waveforms.py         |  | time_domain,  |  | audio_io.py    |
+    +--------------------+  |  freq_domain,  |  +----------------+
+                             |  stft          |
+                             +---------------+
+                 \\                |                /
+                  \\               v               /
+                   +---------------------------+
+                   |  src/common/wav_io.py      |
+                   |  (WAV encode/decode)       |
+                   +---------------------------+
+
+2. MODULE BREAKDOWN
+--------------------
+
+src/generator/waveforms.py  (pure functions, no UI, no I/O)
+  Synthesizes a discrete numpy array of samples for a given waveform
+  type, frequency, duration, sample rate and amplitude:
+    - sine()        np.sin
+    - square()       phase compared against duty_cycle -> +-amplitude
+    - triangular()   triangle wave via phase folding
+    - chirp()        linear frequency sweep f0_hz -> f1_hz (quadratic phase)
+    - sinc_pulse()    np.sinc, centered at duration_s / 2
+  All share a private _time_vector(duration_s, sample_rate) helper that
+  builds the discrete sample times t = n / sample_rate for
+  n = 0 .. duration_s * sample_rate. This *is* the digital sampling step
+  — every "continuous-looking" waveform in this app is actually this
+  discrete array; see section 5 on why plots can look continuous.
+
+src/analyzer/  (pure functions, no UI, no I/O)
+  - time_domain.py   time_vector(), rms(), peak_to_peak()
+  - freq_domain.py   fft_spectrum() — np.fft.rfft, single-sided spectrum,
+                      magnitude normalized by N; to_db() — 20*log10
+                      relative to the spectrum's own peak, floored at
+                      -100 dB to avoid log(0).
+  - stft.py          stft_spectrogram() — thin wrapper around
+                      scipy.signal.stft (nperseg=256 default), returns
+                      (freqs, times, magnitude) for the spectrogram plot.
+
+src/common/wav_io.py  (pure functions, shared by Generator + Analyzer)
+  - to_wav_bytes()    float signal in [-1, 1] -> 16-bit PCM WAV bytes
+                      (Generator's download button / st.audio playback)
+  - from_wav_bytes()  WAV bytes -> mono float64 signal in [-1, 1]
+                      (Analyzer's "upload your own WAV" path; downmixes
+                      stereo by averaging channels, normalizes by dtype
+                      max)
+
+src/hardware_io/audio_io.py  (the only module touching real hardware)
+  - play()    sounddevice.play() + sd.wait() — blocking playback through
+              whatever sound device the *process* is running on
+  - record()  sounddevice.rec() + sd.wait() — blocking mic capture
+  Isolated here specifically so generator/analyzer stay hardware-free
+  and unit-testable without an audio device attached.
+
+app/  (Streamlit integration layer — the only place all modules meet)
+  - _pathfix.py           inserted at the top of every page; puts the
+                          repo root on sys.path so `from src... import`
+                          resolves regardless of Streamlit's cwd.
+  - Home.py               landing page, static nav description.
+  - pages/1_Generator.py  waveform_type/frequency/duration/sample_rate/
+                          amplitude controls -> calls src.generator ->
+                          plots via Plotly (interactive time-domain
+                          view, see section 5) -> WAV export via
+                          wav_io.to_wav_bytes() -> st.audio() for
+                          in-browser playback -> stores signal in
+                          st.session_state["last_signal"] /
+                          ["last_sample_rate"] / ["last_label"].
+  - pages/2_Analyzer.py   reads st.session_state, or accepts an
+                          uploaded WAV (wav_io.from_wav_bytes) -> calls
+                          src.analyzer.{time_domain,freq_domain,stft} ->
+                          renders time domain (Plotly, interactive),
+                          FFT magnitude in dB (matplotlib), and STFT
+                          spectrogram (matplotlib pcolormesh + colorbar).
+  - pages/3_Live_Hardware.py  play/record the current session signal via
+                          src.hardware_io.audio_io — see section 4 for
+                          why this only works when run locally.
+
+3. DATA FLOW (typical session)
+-------------------------------
+  1. User sets parameters on the Generator page.
+  2. src.generator.waveforms.<type>() returns a numpy float array.
+  3. Page stores it in st.session_state (this *is* the app's only
+     "state" — there is no database or persisted storage; state is
+     lost when the browser session ends).
+  4. wav_io.to_wav_bytes() encodes it for st.audio() (playback) and
+     st.download_button() (file export).
+  5. User switches to the Analyzer page (or uploads a WAV directly,
+     bypassing steps 1-4 entirely).
+  6. Analyzer reads the array from session_state (or decodes the
+     upload via wav_io.from_wav_bytes()) and runs it through
+     time_domain / freq_domain / stft to produce the three views.
+
+4. DEPLOYMENT ARCHITECTURE
+----------------------------
+  Hosted on Streamlit Community Cloud, tracking the private GitHub repo
+  23f3000144/Signal_Project_2026_S24 (branch: main). Every push to main
+  triggers an automatic rebuild; dependencies come from requirements.txt
+  (numpy, scipy, streamlit, sounddevice, matplotlib, plotly, pytest) and
+  packages.txt (apt-level deps needed by sounddevice's PortAudio backend
+  on the Cloud's Linux container).
+
+  IMPORTANT — hardware I/O only works locally:
+  src.hardware_io.audio_io talks to whatever sound device the *Python
+  process* runs on via PortAudio/sounddevice. When the app runs on
+  Streamlit Cloud, that "process" is the cloud container, which has no
+  real speaker or microphone — so the Live Hardware page cannot
+  meaningfully play/record there, regardless of which browser or device
+  (desktop, Android, iPhone, installed PWA) is viewing the page. This is
+  unrelated to client-side capability; it's a server vs. client hardware
+  boundary. By contrast, st.audio() playback on the Generator page DOES
+  work everywhere hosted, because it streams WAV bytes to the browser
+  and plays them via the client's own HTML5 <audio> element — genuine
+  client-side playback, no server hardware involved.
+
+  App-level sharing is controlled independently of repo visibility via
+  the Streamlit Cloud dashboard (Settings -> Sharing): the GitHub repo
+  can stay private while the deployed app itself is set to public
+  (viewable by anyone with the link, no login required).
+
+5. WHY THE GRAPHS CAN LOOK CONTINUOUS
+----------------------------------------
+Every signal in this app is a discrete numpy array of samples (see
+section 2, waveforms._time_vector). Two things make it *look*
+continuous when plotted:
+  - matplotlib's/plotly's default line mode draws straight segments
+    connecting consecutive samples ("connect the dots").
+  - Typical sample rates (8000-44100 Hz) are high relative to the
+    audio frequencies being plotted, so consecutive samples are close
+    together and the interpolated line looks smooth.
+Both time-domain plots (Generator, Analyzer) now support a "Show
+discrete samples (stem plot)" checkbox, which draws each sample as an
+individual marker on a vertical stem instead of a connected line, and
+both are rendered with Plotly so the user can scroll/drag-zoom in to
+see individual samples over just a few wave cycles, rather than only
+pre-selecting a view window before render.
+
+6. TESTING STRATEGY
+---------------------
+tests/ mirrors the src/ layout 1:1, plus test_app_smoke.py which drives
+the real multipage app end-to-end via streamlit.testing.v1.AppTest
+(Home -> Generator -> Analyzer -> Live Hardware), asserting zero
+exceptions and correct plot/metric counts at each step. Pure DSP
+functions (generator/analyzer/common) are unit-testable without any
+hardware or UI; only src/hardware_io is inherently unverifiable outside
+a machine with a real audio device.
+
+7. KEY DESIGN DECISIONS (see key_decisions.txt for full rationale)
+----------------------------------------------------------------------
+  - Python end-to-end (numpy/scipy/Streamlit) — one language, ready-made
+    DSP primitives, no JS/Python split.
+  - Module split by directory (generator / analyzer / hardware_io+app)
+    mirrors the three-person team split, minimizing merge conflicts.
+  - Hardware I/O isolated to one module so the DSP core stays pure and
+    testable without a sound device.
+  - Streamlit chosen over a custom frontend for fast iteration and a
+    trivial free deployment path (Community Cloud), at the cost of full
+    UI control (worked around for interactivity via Plotly where
+    needed, e.g. zoomable time-domain plots).

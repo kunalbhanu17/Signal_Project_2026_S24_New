@@ -1,0 +1,215 @@
+VIVA PREPARATION — QUESTION BANK
+Signal Generator & Analyzer (SP24)
+=====================================
+(Viva is 50% of the grade — see course_faq_reference.md. Every team
+member must be able to answer these individually, not just the person
+who wrote that part of the code. See questions_plus_answer.txt for
+model answers tied to this codebase.)
+
+SECTION 1 — DSP FUNDAMENTALS
+-----------------------------
+1.1  What is a signal? What is the difference between an analog and a
+     digital signal?
+1.2  What is sampling? State the Nyquist–Shannon sampling theorem.
+1.3  What is the Nyquist rate / Nyquist frequency for a given signal?
+1.4  What is aliasing? How would you demonstrate it using this app?
+1.5  Why do the plots in this app "look" continuous when the underlying
+     signal is a discrete array of samples?
+1.6  What is the difference between amplitude, frequency, phase, and
+     period of a periodic signal?
+1.7  What is duty cycle, and which waveform in this app uses it?
+1.8  What is a chirp signal? Where are chirp signals used in practice?
+1.9  Why is the sinc function important in signal processing (its
+     relationship to the ideal low-pass filter / brick-wall filter)?
+1.10 What happens mathematically to a sinc pulse as its frequency
+     parameter increases?
+1.11 What is RMS (root mean square) of a signal, and what does it
+     represent physically (e.g., in terms of power)?
+1.12 What is peak-to-peak amplitude, and how does it differ from RMS?
+1.13 What is quantization, and where does it occur in this project?
+
+SECTION 2 — WAVEFORM GENERATION (src/generator/waveforms.py)
+--------------------------------------------------------------
+2.1  Walk through how `_time_vector()` builds the discrete sample times.
+     Why divide by sample_rate instead of multiplying?
+2.2  How is the sine wave generated? Write/derive its formula.
+2.3  How is the square wave generated without directly using a sign()
+     of sin()? Explain the modulo-based phase computation.
+2.4  How does changing `duty_cycle` change the square wave's shape?
+     What duty cycle produces a symmetric square wave?
+2.5  How is the triangular wave derived from the phase? Explain the
+     role of `np.floor(phase + 0.5)`.
+2.6  What is a linear chirp? Explain the formula used for its
+     instantaneous phase, and why the phase term is quadratic in time
+     while the frequency term is linear.
+2.7  What is the "chirp rate" k in the code, and what are its units?
+2.8  How is the sinc pulse centered in the time window? Why subtract
+     `duration_s / 2`?
+2.9  Why are all five waveform generators "pure functions" (no UI, no
+     I/O)? What is the benefit for testing?
+2.10 What would happen if `frequency_hz` exceeds half the sample rate
+     for any of these generators?
+2.11 What is the instantaneous frequency of a chirp at time t, and how
+     do you derive it from the phase function (dφ/dt)?
+
+SECTION 3 — FREQUENCY-DOMAIN ANALYSIS (src/analyzer/freq_domain.py)
+-----------------------------------------------------------------------
+3.1  What is the Fourier Transform, and why is it used to analyze a
+     signal generated in the time domain?
+3.2  What is the FFT (Fast Fourier Transform), and how does it differ
+     algorithmically from the DFT?
+3.3  Why does the code use `np.fft.rfft` instead of `np.fft.fft`?
+3.4  What is a "single-sided" spectrum, and why is it valid to discard
+     the negative-frequency half for a real-valued signal?
+3.5  How are the frequency bin values computed (`np.fft.rfftfreq`)?
+     What determines the frequency resolution of the FFT?
+3.6  Why is the FFT magnitude normalized by dividing by `n` (the number
+     of samples)?
+3.7  Explain the `to_db()` function: why 20*log10, why normalize to the
+     spectrum's own peak, and why floor at -100 dB?
+3.8  What would the FFT of a pure sine wave look like versus the FFT of
+     a square wave? Why does a square wave have odd harmonics?
+3.9  What is spectral leakage, and could it occur in this analyzer
+     (no windowing is applied before the FFT)?
+3.10 If you doubled the duration (and hence number of samples) of a
+     signal at a fixed sample rate, how would the FFT's frequency
+     resolution change?
+
+SECTION 4 — SHORT-TIME FOURIER TRANSFORM / SPECTROGRAM (src/analyzer/stft.py)
+---------------------------------------------------------------------------------
+4.1  Why is a single FFT insufficient for analyzing a signal whose
+     frequency content changes over time (e.g., a chirp)?
+4.2  What is the STFT, and how does it combine time and frequency
+     resolution?
+4.3  What is `nperseg` in `scipy.signal.stft`, and what does changing
+     it (e.g., 256 vs. 1024) trade off between time resolution and
+     frequency resolution?
+4.4  What is the time-frequency resolution trade-off (uncertainty
+     principle) in STFT analysis?
+4.5  What does a spectrogram plot represent — what are its axes and
+     what does color/intensity represent?
+4.6  What would the spectrogram of a chirp signal look like, and why?
+4.7  What window function does `scipy.signal.stft` use by default, and
+     why is windowing necessary for STFT?
+4.8  What is overlap between STFT segments, and what is its default in
+     scipy, and why is overlap used?
+
+SECTION 5 — TIME-DOMAIN ANALYSIS (src/analyzer/time_domain.py)
+------------------------------------------------------------------
+5.1  How is the time vector reconstructed purely from the signal length
+     and sample rate (no timestamps stored)?
+5.2  Walk through the RMS formula implementation and confirm it matches
+     the mathematical definition.
+5.3  For a sine wave of amplitude A, what is the theoretical RMS value,
+     and does the app's computed RMS match it?
+5.4  What is peak-to-peak amplitude for a sine wave of amplitude A, and
+     does it match the code's output?
+
+SECTION 6 — WAV / AUDIO ENCODING (src/common/wav_io.py)
+------------------------------------------------------------
+6.1  What is PCM (Pulse Code Modulation)?
+6.2  Why does `to_wav_bytes()` clip the signal to [-1, 1] before
+     converting, and why multiply by 32767 rather than 32768?
+6.3  What is 16-bit PCM, and what dynamic range/resolution does 16 bits
+     give you?
+6.4  How does `from_wav_bytes()` handle stereo input, and why average
+     the channels instead of, say, taking only the left channel?
+6.5  Why does decoding divide by `np.iinfo(dtype).max` to normalize back
+     to [-1, 1]?
+6.6  What information is stored in a WAV file header, and why is
+     sample_rate returned separately by `from_wav_bytes()`?
+
+SECTION 7 — HARDWARE I/O (src/hardware_io/audio_io.py)
+------------------------------------------------------------
+7.1  Why is `sounddevice` isolated into its own module rather than
+     called directly from the generator/analyzer code?
+7.2  What is the practical difference between `sd.play()` (blocking via
+     `sd.wait()`) and a non-blocking playback call?
+7.3  Why does the Live Hardware page only work when the app is run
+     locally, and not on Streamlit Community Cloud?
+7.4  Why does `st.audio()` (browser playback on the Generator page)
+     work everywhere, including the hosted deployment, while
+     `sounddevice` playback does not?
+7.5  What hardware does PortAudio (the backend behind `sounddevice`)
+     abstract over?
+
+SECTION 8 — SOFTWARE ARCHITECTURE & DESIGN DECISIONS
+---------------------------------------------------------
+8.1  Describe the overall architecture of the app (layers, data flow,
+     module boundaries).
+8.2  Why was the project split into `generator`, `analyzer`,
+     `hardware_io`, `common`, and `app` directories? How does this
+     mapping relate to the three-person team?
+8.3  Why are the generator and analyzer modules kept "pure" (no
+     Streamlit imports, no hardware calls)? What testing benefit does
+     this give?
+8.4  How does state (the "current signal") pass between the Generator
+     page and the Analyzer page, given there is no database?
+8.5  What is Streamlit's execution model (rerun-the-script-top-to-
+     bottom), and how does `st.session_state` fit into it?
+8.6  Why was Python chosen over a client-side JavaScript stack (Web
+     Audio API + React) for this project?
+8.7  Why was a Python-backend + separate JS-frontend split rejected?
+8.8  Why Streamlit specifically, and what trade-off did it introduce
+     (UI control) — and how was that trade-off addressed for the
+     time-domain plots (Plotly, zoom, discrete-sample stem view)?
+8.9  What is `_pathfix.py` for, and why is it needed at the top of
+     every Streamlit page?
+
+SECTION 9 — TESTING
+-------------------------
+9.1  What is the test strategy for this project, and how does the
+     tests/ directory mirror src/?
+9.2  Why can the DSP core (generator/analyzer/common) be fully unit
+     tested, but hardware_io cannot?
+9.3  What does `test_app_smoke.py` verify, and what tool
+     (`streamlit.testing.v1.AppTest`) does it use to drive the real
+     multipage app?
+9.4  How would you test that the square wave generator produces the
+     correct duty cycle, or that the FFT correctly identifies a known
+     input frequency?
+
+SECTION 10 — DEPLOYMENT
+-----------------------------
+10.1 Where is the app hosted, and what triggers a redeploy?
+10.2 What are `requirements.txt` and `packages.txt` each for, and why
+     does `sounddevice` need an apt-level (`packages.txt`) dependency
+     on Streamlit Cloud?
+10.3 How is app-level sharing (public link) controlled independently
+     of the GitHub repository's visibility (private)?
+10.4 Why can't the Live Hardware page play/record real audio on the
+     cloud deployment, regardless of which device/browser is viewing
+     it?
+
+SECTION 11 — PROJECT / COURSE MANAGEMENT
+----------------------------------------------
+11.1 What is SP24, and what are its two required components per the
+     course topic list?
+11.2 What is each team member individually responsible for (module
+     ownership), and can you explain a module you did not personally
+     write?
+11.3 What was the main alternative tech stack considered, and why was
+     it rejected?
+11.4 What would you change or add if you had more time (e.g., other
+     filter types, real-time streaming analysis, additional
+     waveforms)?
+
+SECTION 12 — LIKELY FOLLOW-UP / "GOTCHA" QUESTIONS
+--------------------------------------------------------
+12.1 If you increased the sample rate but kept frequency fixed, what
+     changes in the generated array (length, resolution) and in the
+     resulting FFT?
+12.2 If you generate a 1 Hz sine wave for 0.5 seconds, how many samples
+     will `_time_vector` produce at sample_rate = 8000? What signal
+     features would you expect to see (or not see) in the FFT given
+     the FFT bin spacing?
+12.3 What would happen if you tried to generate a waveform with
+     frequency higher than the Nyquist frequency of the chosen sample
+     rate — what artifact would you expect in the analyzer?
+12.4 Why is a floor of -100 dB used in `to_db()` instead of allowing
+     -infinity for a zero-magnitude bin?
+12.5 Why does the square-wave duty-cycle comparison use `phase <
+     duty_cycle` rather than `<=`? Does it matter practically?
+12.6 Explain, step by step, what happens end-to-end when a user
+     uploads an arbitrary WAV file to the Analyzer page instead of
+     using a generated signal.

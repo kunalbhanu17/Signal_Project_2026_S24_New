@@ -29,7 +29,7 @@ Legend: `[A]` Person A (generator), `[B]` Person B (analyzer),
       still required (course FAQ: proposal is required for **custom**
       topics; pre-approved topics start immediately after the selection
       form). If a proposal is wanted anyway, draft
-      `documentation/proposal.md` (Problem / Objectives / Methodology) and
+      `doc_operations/proposal.md` (Problem / Objectives / Methodology) and
       send to vishal@study.iitm.ac.in, cc venkatesan@study.iitm.ac.in,
       ankita_p@study.iitm.ac.in.
 - [ ] `[ALL]` Each person clones the repo and sets up their branch per
@@ -111,7 +111,7 @@ Legend: `[A]` Person A (generator), `[B]` Person B (analyzer),
 ## 4. Viva prep (50% of the grade — don't shortchange this)
 - [ ] `[ALL]` Each person can independently explain: the DSP theory behind
       their module (FFT/STFT math, waveform synthesis formulas), design
-      decisions in `documentation/key_decisions.txt`, and the full
+      decisions in `doc_operations/key_decisions.txt`, and the full
       pipeline end-to-end — not just their own piece.
 - [ ] `[ALL]` Do a practice run-through of the demo + likely viva
       questions together before the real viva.
