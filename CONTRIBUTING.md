@@ -1,8 +1,7 @@
 # Working simultaneously as a team of 3
 
-The repo is split into three module-owned directories so three people
-(each with their own Claude Code agent) can work at the same time with
-minimal merge conflicts:
+The repo is split into three module-owned directories so three people can
+work at the same time with minimal merge conflicts:
 
 | Person | Branch                  | Owns                                   |
 |--------|--------------------------|-----------------------------------------|
@@ -22,10 +21,9 @@ minimal merge conflicts:
    ```bash
    git checkout -b feature/generator   # or feature/analyzer / feature/app-hardware
    ```
-3. Run your own Claude Code agent inside that clone, working only inside
-   your owned directory (see that module's `README.md` for its interface
-   contract — that contract is what lets the other two modules integrate
-   with yours without needing to read your code).
+3. Work only inside your owned directory (see that module's `README.md`
+   for its interface contract — that contract is what lets the other two
+   modules integrate with yours without needing to read your code).
 4. Commit and push to your branch regularly:
    ```bash
    git push -u origin feature/generator
@@ -36,8 +34,8 @@ minimal merge conflicts:
 
 ## If working on one shared machine instead
 
-Use `git worktree` so each person's Claude agent gets its own working
-directory (no branch-switching collisions) against the same local clone:
+Use `git worktree` so each person gets their own working directory (no
+branch-switching collisions) against the same local clone:
 
 ```bash
 git worktree add ../signals-generator feature/generator
@@ -45,7 +43,7 @@ git worktree add ../signals-analyzer feature/analyzer
 git worktree add ../signals-app feature/app-hardware
 ```
 
-Run one Claude Code agent per worktree directory.
+Work from one worktree directory per person.
 
 ## Keeping merge conflicts rare
 

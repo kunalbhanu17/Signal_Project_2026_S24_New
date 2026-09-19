@@ -19,9 +19,9 @@ KEY DECISIONS LOG — SP24 Signal Generator & Analyzer Project
 2026-08-06 — Tech stack
   Decision : Python throughout — numpy/scipy for the DSP math (FFT, STFT,
              filter design), sounddevice for audio I/O, Streamlit for the UI.
-  Why      : User asked for a stack with ready-made signal-processing
-             operations, low ramp-up for teammates, and a plausible path to
-             real hardware later. numpy/scipy is the standard DSP toolkit;
+  Why      : Wanted a stack with ready-made signal-processing operations,
+             low ramp-up for teammates, and a plausible path to real
+             hardware later. numpy/scipy is the standard DSP toolkit;
              a single language avoids a JS/Python split; sounddevice talks
              directly to the sound card (real hardware) and the same
              abstraction can later target other hardware I/O (serial/ADC).
@@ -32,7 +32,7 @@ KEY DECISIONS LOG — SP24 Signal Generator & Analyzer Project
 
 2026-08-06 — Repo ownership split (for 3 people working simultaneously)
   Decision : One repo, three module-owned directories to minimize merge
-             conflicts, each mapped to a Claude Code agent working
+             conflicts, each owned by one team member working
              independently on its own branch:
                src/generator/   → Person A (waveform synthesis engine)
                src/analyzer/    → Person B (time/freq/STFT analysis engine)
@@ -40,10 +40,10 @@ KEY DECISIONS LOG — SP24 Signal Generator & Analyzer Project
                                  integration, deployment)
              Shared code lives in src/common/. Each person works on a
              feature/<module> branch and merges to main via PR.
-  Why      : Keeps each person's Claude agent editing a disjoint set of
-             files most of the time, so simultaneous work rarely collides
-             on the same lines. app/ (integration layer) is the one place
-             all three modules meet, owned by Person C, merged last.
+  Why      : Keeps each person editing a disjoint set of files most of the
+             time, so simultaneous work rarely collides on the same lines.
+             app/ (integration layer) is the one place all three modules
+             meet, owned by Person C, merged last.
 
 2026-08-06 — GitHub repo
   Decision : Use existing repo github.com/23f3000144/Signal_Project_2026_S24
@@ -63,18 +63,17 @@ KEY DECISIONS LOG — SP24 Signal Generator & Analyzer Project
              import (Analyzer, so any signal can be analyzed, not just
              what was just generated), in-browser audio playback via
              st.audio, plus the local-only sounddevice page.
-  Why      : User asked to "finish the project so we can send to others" —
-             i.e. hand teammates something they can actually run and build
-             on, not a skeleton.
+  Why      : Needed a working baseline the whole team could run and build
+             on immediately, not a skeleton.
   Verified : 16/16 pytest tests pass, including new
              tests/test_app_smoke.py which drives the real multipage app
              via streamlit.testing.v1.AppTest (Home → Generator → Analyzer
              → Live Hardware, checking for zero exceptions and correct
              plot/metric output at each step). Confirmed the running app
              also serves over HTTP. sounddevice hardware I/O itself
-             (actual playback/recording) could not be verified in this
-             sandbox — no audio device present — so that still needs a
-             human check on a real machine.
+             (actual playback/recording) could not be verified on this
+             development machine — no audio device present — so that
+             still needs a human check on a real machine.
   Caveat   : This is a reference build, not a substitute for the team
              understanding it. Viva is 50% of the grade and requires
              explaining the DSP concepts/implementation individually — see

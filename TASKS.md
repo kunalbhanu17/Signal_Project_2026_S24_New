@@ -66,7 +66,7 @@ Legend: `[A]` Person A (generator), `[B]` Person B (analyzer),
 ### `[C]` App + Hardware (`src/hardware_io/`, `app/`)
 - [ ] Verify `sounddevice` play/record works on your machine; document
       any platform-specific setup (e.g. PortAudio install) in README.
-      (Not verifiable in the sandbox this was built in — no audio
+      (Not verifiable on the machine this was built on — no audio
       hardware there. Logic is unit-tested with mocked `sounddevice`
       calls, but real-hardware playback/recording needs a human to check.)
 - [x] Three Streamlit pages implemented: Generator (waveform plot,

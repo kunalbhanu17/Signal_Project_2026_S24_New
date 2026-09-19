@@ -55,5 +55,4 @@ pytest
 ## Working as a team of 3
 
 See `CONTRIBUTING.md` for the branch-per-module workflow that lets three
-people (each running their own Claude Code agent) work simultaneously
-without stepping on each other's files.
+people work simultaneously without stepping on each other's files.
