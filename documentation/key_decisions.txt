@@ -79,3 +79,45 @@ KEY DECISIONS LOG — SP24 Signal Generator & Analyzer Project
              understanding it. Viva is 50% of the grade and requires
              explaining the DSP concepts/implementation individually — see
              the status note at the top of TASKS.md.
+
+2026-09-19 — Deployment target and FFT windowing
+  Decision : Deployed to Streamlit Community Cloud (repo already had
+             packages.txt/requirements.txt ready for it). Also closed the
+             one remaining analyzer gap: FFT windowing (Hann/Hamming vs.
+             rectangular), added as a selector on the Analyzer page
+             (src/analyzer/freq_domain.py:fft_spectrum's `window` param).
+  Why      : Course FAQ deadline is 20 September; hosted deployment lets a
+             grader open the app without cloning the repo. The windowing
+             gap was flagged from a team status slide cross-checked
+             against the actual code.
+  Caveat   : The hosted app's viewer access follows the source repo's
+             GitHub visibility (private, under the school account) — a
+             grader without a Streamlit Cloud login/invite may hit an auth
+             wall. Check the app's sharing settings if that's a problem.
+
+2026-09-19 — Video demo via automated Playwright walkthrough, not manual screen recording
+  Decision : Wrote a Playwright browser test (tests/e2e/test_demo.py) that
+             drives the real running app — cycles every waveform on the
+             Generator page, exercises the Analyzer's time/FFT/STFT views
+             and the new FFT-window selector, and checks the Live
+             Hardware page loads — and records it with Playwright's
+             built-in video capture (`--video=on`), run once each against
+             a light-theme and a dark-theme Streamlit server
+             (--theme.base). Output converted to MP4 via ffmpeg into
+             report/video_demo/app_walkthrough_{light,dark}.mp4. A banner
+             overlay names each step for ~3s so the recording explains
+             itself without narration.
+  Why      : Doubles as both an automated regression test and the video
+             deliverable, is fully reproducible (tests/e2e/README.md), and
+             avoids relying on a human screen-recording session under
+             deadline pressure. Reused the same underlying approach (a
+             prior project's e2e_tests/ used Selenium + a custom
+             ffmpeg/xvfb screen-capture recorder) but simplified it:
+             Playwright records video natively, no screen-capture hack
+             needed.
+  Caveat   : The video does not show live hardware playback/recording
+             actually happening — sounddevice needs a real audio device,
+             which the automation sandbox doesn't have. Generator page
+             audio (st.audio, works everywhere including hosted) IS shown.
+             If the live-hardware playback demo is wanted on video, record
+             that part separately on a machine with real audio hardware.

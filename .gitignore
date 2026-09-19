@@ -4,6 +4,7 @@ __pycache__/
 venv/
 .pytest_cache/
 .streamlit/
+test-results/
 *.wav
 .DS_Store
 .env

@@ -76,8 +76,9 @@ Legend: `[A]` Person A (generator), `[B]` Person B (analyzer),
 - [x] `tests/test_hardware_io.py` (mocked `sounddevice`) and
       `tests/test_app_smoke.py` (full multipage app, via
       `streamlit.testing.v1.AppTest`) both pass.
-- [ ] Decide on deployment target (Streamlit Community Cloud vs. local +
-      video demo only) and document the choice in `key_decisions.txt`.
+- [x] Decide on deployment target (Streamlit Community Cloud vs. local +
+      video demo only) and document the choice in `key_decisions.txt` —
+      deployed to Streamlit Community Cloud.
 
 ## 2. Integration (`[C]` leads, `[A]`/`[B]` review)
 - [x] `feature/generator`, `feature/analyzer`, `feature/app-hardware`
@@ -96,8 +97,13 @@ Legend: `[A]` Person A (generator), `[B]` Person B (analyzer),
       7) Problems faced & solutions 8) Results and discussions
       9) Conclusions 10) Individual contributions 11) Annexure (Drive link
       to video + code zip — **must be "anyone with the link"**).
-- [ ] `[C]` Record video demo: generator producing each waveform type,
-      analyzer showing time/freq/STFT views, live hardware playback.
+- [x] `[C]` Record video demo: generator producing each waveform type,
+      analyzer showing time/freq/STFT views (incl. FFT windowing), light
+      + dark theme — automated via Playwright, see `tests/e2e/README.md`.
+      `report/video_demo/app_walkthrough_{light,dark}.mp4`. Does **not**
+      show live hardware playback/recording in action (no audio device in
+      the automation environment) — still needs a human to record that
+      part on a machine with real audio hardware if it's wanted on video.
 - [ ] `[ALL]` Zip the code (or link the GitHub repo) and upload to Google
       Drive with public link access; add link to report Annexure.
 - [ ] `[ALL]` Submit report + video + code via the Seek portal.

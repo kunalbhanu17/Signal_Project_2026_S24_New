@@ -9,15 +9,24 @@ from src.common.wav_io import from_wav_bytes
 
 st.title("Analyzer")
 
-uploaded = st.file_uploader("Analyze your own WAV file (optional)", type=["wav"])
-if uploaded is not None:
-    signal, sample_rate = from_wav_bytes(uploaded.read())
-    st.session_state["last_signal"] = signal
-    st.session_state["last_sample_rate"] = sample_rate
-    st.session_state["last_label"] = uploaded.name
+with st.sidebar:
+    st.subheader("Controls")
+    uploaded = st.file_uploader("Analyze your own WAV file (optional)", type=["wav"])
+    if uploaded is not None:
+        signal, sample_rate = from_wav_bytes(uploaded.read())
+        st.session_state["last_signal"] = signal
+        st.session_state["last_sample_rate"] = sample_rate
+        st.session_state["last_label"] = uploaded.name
 
-signal = st.session_state.get("last_signal")
-sample_rate = st.session_state.get("last_sample_rate")
+    signal = st.session_state.get("last_signal")
+    sample_rate = st.session_state.get("last_sample_rate")
+
+    if signal is not None:
+        duration_ms = len(signal) / sample_rate * 1000
+        default_view_ms = float(min(50.0, duration_ms))
+        view_ms = st.slider("View window (ms)", 5.0, float(duration_ms), default_view_ms)
+        show_samples = st.checkbox("Show discrete samples (stem plot)", value=True)
+        window = st.selectbox("FFT window", list(freq_domain.WINDOWS.keys()))
 
 if signal is None:
     st.info("Generate a signal on the Generator page, or upload a WAV file above.")
@@ -33,13 +42,9 @@ col1.metric("RMS", f"{time_domain.rms(signal):.4f}")
 col2.metric("Peak-to-peak", f"{time_domain.peak_to_peak(signal):.4f}")
 
 st.subheader("Time domain")
-duration_ms = len(signal) / sample_rate * 1000
-default_view_ms = float(min(50.0, duration_ms))
-view_ms = st.slider("View window (ms)", 5.0, float(duration_ms), default_view_ms)
 n_view = max(2, int(sample_rate * view_ms / 1000))
 t_ms = np.arange(n_view) / sample_rate * 1000
 sig_view = signal[:n_view]
-show_samples = st.checkbox("Show discrete samples (stem plot)")
 
 fig1 = go.Figure()
 if show_samples:
@@ -55,7 +60,6 @@ fig1.update_layout(xaxis_title="Time (ms)", yaxis_title="Amplitude")
 st.plotly_chart(fig1, use_container_width=True)
 
 st.subheader("Frequency domain (FFT)")
-window = st.selectbox("FFT window", list(freq_domain.WINDOWS.keys()))
 freqs, magnitude = freq_domain.fft_spectrum(signal, sample_rate, window)
 db = freq_domain.to_db(magnitude)
 fig2, ax2 = plt.subplots()
