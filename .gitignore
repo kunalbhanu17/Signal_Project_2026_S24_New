@@ -9,4 +9,3 @@ test-results/
 !tests/e2e/fixtures/*.wav
 .DS_Store
 .env
-.claude/settings.local.json
