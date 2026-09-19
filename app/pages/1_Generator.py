@@ -60,6 +60,7 @@ fig.update_layout(
     title=f"{waveform_type} @ {freq_hz} Hz",
     xaxis_title="Time (ms)",
     yaxis_title="Amplitude",
+    uirevision="generator-waveform-plot",
 )
 st.plotly_chart(fig, use_container_width=True)
 

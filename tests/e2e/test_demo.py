@@ -4,6 +4,10 @@ Run with `--video=on` (see tests/e2e/README.md) so Playwright records a
 .webm of the whole walkthrough into test-results/. Parametrized over
 light/dark theme (see conftest.py), so this produces one video per theme.
 
+Live Hardware isn't included — sounddevice needs real audio hardware the
+automation environment doesn't have, and it's already covered by the
+AppTest smoke test in tests/test_app_smoke.py.
+
 Notes on Streamlit + Playwright quirks this file works around:
 - Multipage navigation must go through the sidebar nav links (client-side
   routing); a direct page.goto() to another page's URL starts a brand new
@@ -17,11 +21,27 @@ Notes on Streamlit + Playwright quirks this file works around:
 - Streamlit fades new content in via a CSS transition; if nothing repaints
   after it settles, Playwright's video recorder freezes on a faded
   mid-transition frame. verify_visible() scrolls the element into view
-  (forcing a repaint) before confirming it's actually visible.
+  (forcing a repaint, and bringing off-screen results into the viewport)
+  before confirming it's actually visible.
 """
 import re
+from pathlib import Path
 
 WAVEFORMS = ["sine", "square", "triangular", "chirp", "sinc_pulse"]
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+WINDOWING_DEMO_WAV = FIXTURES_DIR / "windowing_demo_440.5Hz.wav"
+
+# Measured with freq_domain.fft_spectrum on the fixture above (see
+# fixtures/README.md): dB level 20 Hz off the signal peak, i.e. how much
+# leakage survives into a nearby bin. Lower = less leakage = better.
+WINDOW_CAPTIONS = {
+    "rectangular": "Rectangular (no window): narrow peak, but heavy leakage — "
+                   "about -32 dB just 20 Hz off-peak",
+    "hann": "Hann window: peak widens, but leakage drops to about -86 dB "
+            "20 Hz off-peak — the skirt around the peak flattens out",
+    "hamming": "Hamming window: leakage suppressed to about -51 dB off-peak — "
+               "between rectangular and Hann",
+}
 
 BANNER_ID = "e2e-test-banner"
 BANNER_JS_SHOW = """(text) => {
@@ -44,7 +64,8 @@ BANNER_JS_HIDE = """() => {
 
 
 def show_banner(page, text, duration_ms=3000):
-    """Overlay a caption naming the step under test, held for `duration_ms`."""
+    """Overlay a caption naming/explaining the step under test, held for
+    `duration_ms` so the recording is understandable without narration."""
     page.evaluate(BANNER_JS_SHOW, text)
     page.wait_for_timeout(duration_ms)
     page.evaluate(BANNER_JS_HIDE)
@@ -56,7 +77,9 @@ def assert_no_exception(page):
 
 def verify_visible(page, locator, timeout=20_000):
     """Scroll into view and confirm visible — forces a repaint so Streamlit's
-    fade-in transition settles instead of freezing mid-fade in the video."""
+    fade-in transition settles instead of freezing mid-fade in the video,
+    and brings below-the-fold results into frame if they're not currently
+    visible in the viewport."""
     locator.wait_for(state="attached", timeout=timeout)
     locator.scroll_into_view_if_needed(timeout=timeout)
     locator.wait_for(state="visible", timeout=timeout)
@@ -119,7 +142,7 @@ def test_full_app_walkthrough(page, theme):
         assert page.get_by_role("button", name=re.compile("Download as WAV")).count() == 1
         assert_no_exception(page)
 
-    # --- Analyzer: time/FFT/STFT views + FFT windowing ---
+    # --- Analyzer: time/FFT/STFT views on the last-generated signal ---
     goto_page(page, "Analyzer", "/Analyzer")
     show_banner(page, "Analyzer: time domain, FFT (dB), and STFT spectrogram")
     page.wait_for_timeout(500)
@@ -127,29 +150,32 @@ def test_full_app_walkthrough(page, theme):
 
     verify_visible(page, page.locator(".js-plotly-plot").first)
     assert page.locator(".js-plotly-plot").count() == 1  # time domain
-    images = page.locator('[data-testid="stImage"] img')
     page.wait_for_function(
         "document.querySelectorAll('[data-testid=\"stImage\"] img').length >= 2",
         timeout=20_000,
     )
-    verify_visible(page, images.last)
-    assert images.count() == 2  # FFT (dB) + STFT spectrogram
+    verify_visible(page, page.locator('[data-testid="stImage"] img').last)
+    assert page.locator('[data-testid="stImage"] img').count() == 2  # FFT (dB) + STFT
 
-    show_banner(page, "FFT windowing: rectangular vs. Hann vs. Hamming")
+    # --- FFT windowing demo: upload a signal deliberately off an FFT bin so
+    # rectangular windowing visibly leaks, and Hann/Hamming visibly don't. ---
+    show_banner(
+        page,
+        "FFT windowing demo: uploading a 440.5 Hz tone (off an FFT bin on purpose, "
+        "so leakage is visible)",
+    )
+    file_input = page.locator('input[type="file"]')
+    file_input.set_input_files(str(WINDOWING_DEMO_WAV))
+    page.wait_for_timeout(1500)
+    assert_no_exception(page)
+    verify_visible(page, page.get_by_text("windowing_demo"))
+
     for window in ["rectangular", "hann", "hamming"]:
         select_option(page, "FFT window", window, exact=True)
-        page.wait_for_timeout(900)
-        verify_visible(page, page.locator('[data-testid="stImage"] img').first)
+        page.wait_for_timeout(700)
+        fft_plot = page.locator('[data-testid="stImage"] img').first
+        verify_visible(page, fft_plot)
+        show_banner(page, WINDOW_CAPTIONS[window])
         assert_no_exception(page)
 
-    # --- Live Hardware: page loads with local-only controls present ---
-    goto_page(page, "Live Hardware", "/Live_Hardware")
-    show_banner(page, "Live Hardware: local sound-card play/record controls")
-    play_button = page.get_by_role("button", name="Play last generated signal")
-    verify_visible(page, play_button)
-    assert_no_exception(page)
-
-    assert play_button.count() == 1
-    assert page.get_by_role("button", name="Record from microphone").count() == 1
-    assert page.get_by_text("this machine's").count() == 1
     show_banner(page, "Walkthrough complete", duration_ms=2000)

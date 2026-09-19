@@ -56,7 +56,9 @@ if show_samples:
     fig1.add_trace(go.Scatter(x=t_ms, y=sig_view, mode="markers", marker=dict(color="steelblue", size=6), showlegend=False))
 else:
     fig1.add_trace(go.Scatter(x=t_ms, y=sig_view, mode="lines", line=dict(color="steelblue"), showlegend=False))
-fig1.update_layout(xaxis_title="Time (ms)", yaxis_title="Amplitude")
+fig1.update_layout(
+    xaxis_title="Time (ms)", yaxis_title="Amplitude", uirevision="analyzer-time-domain-plot"
+)
 st.plotly_chart(fig1, use_container_width=True)
 
 st.subheader("Frequency domain (FFT)")

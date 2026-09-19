@@ -6,6 +6,7 @@ venv/
 .streamlit/
 test-results/
 *.wav
+!tests/e2e/fixtures/*.wav
 .DS_Store
 .env
 .claude/settings.local.json
