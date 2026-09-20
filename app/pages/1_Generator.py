@@ -13,7 +13,11 @@ with st.sidebar:
     waveform_type = st.selectbox(
         "Waveform", ["sine", "square", "triangular", "chirp", "sinc_pulse"]
     )
-    freq_hz = st.slider("Frequency (Hz)", 20, 2000, 440)
+    freq_hz = st.slider(
+        "Frequency (Hz)", 20.0, 2000.0, 440.0, step=0.5,
+        help="A non-integer value (e.g. 440.5) won't land on an exact FFT "
+             "bin, so the Analyzer page will show spectral leakage.",
+    )
     duration_s = st.slider("Duration (s)", 0.1, 5.0, 1.0)
     sample_rate_choice = st.selectbox("Sample rate (Hz)", ["8000", "16000", "44100", "Custom"], index=2)
     if sample_rate_choice == "Custom":
@@ -27,14 +31,14 @@ with st.sidebar:
     if waveform_type == "square":
         duty_cycle = st.slider("Duty cycle", 0.05, 0.95, 0.5)
         signal = waveforms.square(freq_hz, duration_s, sample_rate, amplitude, duty_cycle)
-        label = f"square_{freq_hz}Hz_dc{duty_cycle:.2f}"
+        label = f"square_{freq_hz:g}Hz_dc{duty_cycle:.2f}"
     elif waveform_type == "chirp":
         f1_hz = st.slider("End frequency (Hz)", 20, 4000, 1000)
         signal = waveforms.chirp(freq_hz, f1_hz, duration_s, sample_rate, amplitude)
-        label = f"chirp_{freq_hz}-{f1_hz}Hz"
+        label = f"chirp_{freq_hz:g}-{f1_hz}Hz"
     else:
         signal = getattr(waveforms, waveform_type)(freq_hz, duration_s, sample_rate, amplitude)
-        label = f"{waveform_type}_{freq_hz}Hz"
+        label = f"{waveform_type}_{freq_hz:g}Hz"
 
     duration_ms = duration_s * 1000
     default_view_ms = float(min(50.0, duration_ms))
@@ -57,7 +61,7 @@ if show_samples:
 else:
     fig.add_trace(go.Scatter(x=t_ms, y=sig_view, mode="lines", line=dict(color="steelblue"), showlegend=False))
 fig.update_layout(
-    title=f"{waveform_type} @ {freq_hz} Hz",
+    title=f"{waveform_type} @ {freq_hz:g} Hz",
     xaxis_title="Time (ms)",
     yaxis_title="Amplitude",
     uirevision="generator-waveform-plot",

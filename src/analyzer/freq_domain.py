@@ -21,6 +21,16 @@ def fft_spectrum(signal: np.ndarray, sample_rate: int, window: str = "rectangula
     return freqs, magnitude
 
 
+def leakage_db(freqs: np.ndarray, magnitude: np.ndarray, offset_hz: float = 20.0) -> float:
+    """dB level `offset_hz` away from the spectrum's peak, relative to the peak.
+
+    Lower (more negative) means less spectral leakage into that neighboring bin.
+    """
+    peak_freq = freqs[np.argmax(magnitude)]
+    idx = np.argmin(np.abs(freqs - (peak_freq + offset_hz)))
+    return float(to_db(magnitude)[idx])
+
+
 def to_db(magnitude: np.ndarray, floor_db: float = -100.0) -> np.ndarray:
     """Converts a magnitude array/2D array to dB, relative to its own peak."""
     peak = np.max(magnitude)

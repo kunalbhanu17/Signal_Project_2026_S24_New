@@ -47,3 +47,14 @@ def test_fft_windows_all_match_rectangular_shape():
     for window in freq_domain.WINDOWS:
         freqs, magnitude = freq_domain.fft_spectrum(signal, sample_rate, window)
         assert freqs.shape == magnitude.shape
+
+
+def test_leakage_db_ranks_windows_rectangular_worst_hann_best():
+    # Off-bin tone (see tests/e2e/fixtures/README.md for the same setup).
+    sample_rate = 44100
+    signal = waveforms.sine(440.5, 1.0, sample_rate)
+    leakage = {}
+    for window in freq_domain.WINDOWS:
+        freqs, magnitude = freq_domain.fft_spectrum(signal, sample_rate, window)
+        leakage[window] = freq_domain.leakage_db(freqs, magnitude)
+    assert leakage["hann"] < leakage["hamming"] < leakage["rectangular"]

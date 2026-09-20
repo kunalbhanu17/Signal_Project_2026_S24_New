@@ -71,6 +71,13 @@ ax2.set_ylabel("Magnitude (dB, relative to peak)")
 ax2.grid(True, alpha=0.3)
 st.pyplot(fig2)
 plt.close(fig2)
+st.metric(
+    f"Spectral leakage ({window}, 20 Hz off-peak)",
+    f"{freq_domain.leakage_db(freqs, magnitude):.1f} dB",
+    help="Magnitude 20 Hz from the peak, relative to the peak. Lower (more "
+         "negative) means less leakage. Compare this number across FFT "
+         "window choices for the same signal.",
+)
 
 st.subheader("STFT (spectrogram)")
 f_stft, t_stft, mag_2d = stft.stft_spectrogram(signal, sample_rate)
