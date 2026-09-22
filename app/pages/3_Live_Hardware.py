@@ -29,17 +29,29 @@ st.caption(
     "Only works when the app is running locally (not on a hosted server)."
 )
 
+NO_SOUND_DEVICE_MSG = (
+    "No local sound device found — this only works when the app runs on "
+    "your own machine with a real speaker/mic attached, not on a hosted "
+    "server. Use the browser microphone above instead."
+)
+
 if st.button("Play last generated signal") and signal is not None:
-    audio_io.play(signal, sample_rate)
-    st.success("Played.")
+    try:
+        audio_io.play(signal, sample_rate)
+        st.success("Played.")
+    except Exception:
+        st.error(NO_SOUND_DEVICE_MSG)
 elif signal is None:
     st.info("Generate a signal on the Generator page first to enable playback.")
 
 duration_s = st.slider("Record duration (s)", 0.5, 5.0, 2.0)
 if st.button("Record from microphone"):
-    recorded = audio_io.record(duration_s, sample_rate or 44100)
-    st.session_state["last_signal"] = recorded
-    st.session_state["last_sample_rate"] = sample_rate or 44100
-    st.session_state["last_label"] = "microphone_recording"
-    st.line_chart({"amplitude": recorded[: min(2000, len(recorded))]})
-    st.success("Recorded — open the Analyzer page to inspect it.")
+    try:
+        recorded = audio_io.record(duration_s, sample_rate or 44100)
+        st.session_state["last_signal"] = recorded
+        st.session_state["last_sample_rate"] = sample_rate or 44100
+        st.session_state["last_label"] = "microphone_recording"
+        st.line_chart({"amplitude": recorded[: min(2000, len(recorded))]})
+        st.success("Recorded — open the Analyzer page to inspect it.")
+    except Exception:
+        st.error(NO_SOUND_DEVICE_MSG)
