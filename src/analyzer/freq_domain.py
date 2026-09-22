@@ -21,6 +21,11 @@ def fft_spectrum(signal: np.ndarray, sample_rate: int, window: str = "rectangula
     return freqs, magnitude
 
 
+def window_curve(n: int, window: str = "rectangular") -> np.ndarray:
+    """Returns the raw window function samples (e.g. for plotting its shape)."""
+    return get_window(WINDOWS[window], n)
+
+
 def leakage_db(freqs: np.ndarray, magnitude: np.ndarray, offset_hz: float = 20.0) -> float:
     """dB level `offset_hz` away from the spectrum's peak, relative to the peak.
 

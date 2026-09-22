@@ -142,20 +142,18 @@ def test_full_app_walkthrough(page, theme):
         assert page.get_by_role("button", name=re.compile("Download as WAV")).count() == 1
         assert_no_exception(page)
 
-    # --- Analyzer: time/FFT/STFT views on the last-generated signal ---
+    # --- Analyzer: compact 2x2 view (default) — waveform, window shape, FFT, STFT ---
     goto_page(page, "Analyzer", "/Analyzer")
-    show_banner(page, "Analyzer: time domain, FFT (dB), and STFT spectrogram")
+    show_banner(page, "Analyzer: compact 2x2 view — waveform, window shape, FFT, and STFT together")
     page.wait_for_timeout(500)
     assert_no_exception(page)
 
-    verify_visible(page, page.locator(".js-plotly-plot").first)
-    assert page.locator(".js-plotly-plot").count() == 1  # time domain
     page.wait_for_function(
-        "document.querySelectorAll('[data-testid=\"stImage\"] img').length >= 2",
+        "document.querySelectorAll('[data-testid=\"stImage\"] img').length >= 4",
         timeout=20_000,
     )
     verify_visible(page, page.locator('[data-testid="stImage"] img').last)
-    assert page.locator('[data-testid="stImage"] img').count() == 2  # FFT (dB) + STFT
+    assert page.locator('[data-testid="stImage"] img').count() == 4  # waveform, window shape, FFT, STFT
 
     # --- FFT windowing demo: upload a signal deliberately off an FFT bin so
     # rectangular windowing visibly leaks, and Hann/Hamming visibly don't. ---
@@ -173,7 +171,8 @@ def test_full_app_walkthrough(page, theme):
     for window in ["rectangular", "hann", "hamming"]:
         select_option(page, "FFT window", window, exact=True)
         page.wait_for_timeout(700)
-        fft_plot = page.locator('[data-testid="stImage"] img').first
+        # compact 2x2 order: waveform(0), window shape(1), FFT(2), STFT(3)
+        fft_plot = page.locator('[data-testid="stImage"] img').nth(2)
         verify_visible(page, fft_plot)
         show_banner(page, WINDOW_CAPTIONS[window])
         assert_no_exception(page)

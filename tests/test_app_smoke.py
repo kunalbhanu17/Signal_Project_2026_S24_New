@@ -31,11 +31,28 @@ def test_generator_page_produces_a_signal():
 
 
 def test_generator_to_analyzer_pipeline_renders_all_plots():
+    # Default is the compact 2x2 view: waveform, window shape, FFT, STFT are
+    # all matplotlib images (no plotly chart) so everything fits one screen.
     at = _start()
     at.switch_page("pages/1_Generator.py")
     at.run(timeout=30)
     at.switch_page("pages/2_Analyzer.py")
     at.run(timeout=30)
+    assert not at.exception
+    assert len(at.get("image")) == 4  # waveform, window shape, FFT, STFT
+    assert len(at.get("plotly_chart")) == 0
+
+
+def test_analyzer_scrolling_layout_when_compact_view_off():
+    at = _start()
+    at.switch_page("pages/1_Generator.py")
+    at.run(timeout=30)
+    at.switch_page("pages/2_Analyzer.py")
+    at.run(timeout=30)
+    compact_checkbox = next(
+        cb for cb in at.checkbox if cb.label == "Compact 2x2 view (no scrolling)"
+    )
+    compact_checkbox.set_value(False).run(timeout=30)
     assert not at.exception
     assert len(at.get("image")) == 2  # FFT, STFT (time domain is an interactive plotly chart)
     assert len(at.get("plotly_chart")) == 1  # time domain

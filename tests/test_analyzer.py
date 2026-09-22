@@ -58,3 +58,12 @@ def test_leakage_db_ranks_windows_rectangular_worst_hann_best():
         freqs, magnitude = freq_domain.fft_spectrum(signal, sample_rate, window)
         leakage[window] = freq_domain.leakage_db(freqs, magnitude)
     assert leakage["hann"] < leakage["hamming"] < leakage["rectangular"]
+
+
+def test_window_curve_shapes():
+    n = 100
+    assert np.allclose(freq_domain.window_curve(n, "rectangular"), 1.0)
+    for window in ["hann", "hamming"]:
+        curve = freq_domain.window_curve(n, window)
+        assert len(curve) == n
+        assert curve[0] < curve[n // 2]  # tapered at the edges, peak in the middle
